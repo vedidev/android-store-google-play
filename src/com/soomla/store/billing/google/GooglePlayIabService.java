@@ -78,6 +78,22 @@ public class GooglePlayIabService implements IIabService {
     }
 
     @Override
+    public void consumeAsync(IabPurchase purchase, final IabCallbacks.OnConsumeListener consumeListener) {
+        mHelper.consumeAsync(purchase, new IabHelper.OnConsumeFinishedListener() {
+            @Override
+            public void onConsumeFinished(IabPurchase purchase, IabResult result) {
+                if(result.isSuccess()) {
+                    
+                    consumeListener.success(purchase);
+                } else {
+                    
+                    consumeListener.fail(result.getMessage());
+                }
+            }
+        });
+    }
+    
+    @Override
     public void launchPurchaseFlow(Activity act,
                                    String sku,
                                    final IabCallbacks.OnPurchaseListener purchaseListener,
