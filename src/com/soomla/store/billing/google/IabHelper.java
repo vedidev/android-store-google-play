@@ -319,7 +319,7 @@ public class IabHelper {
         IabResult result;
 
         if (itemType.equals(ITEM_TYPE_SUBS) && !mSubscriptionsSupported) {
-            IabResult r = new IabResult(IABHELPER_SUBSCRIPTIONS_NOT_AVAILABLE,
+            IabResult r = new IabResult(IabResult.IABHELPER_SUBSCRIPTIONS_NOT_AVAILABLE,
                     "Subscriptions are not available.");
             if (listener != null) listener.onIabPurchaseFinished(r, null);
             return;
@@ -332,9 +332,10 @@ public class IabHelper {
             int response = getResponseCodeFromBundle(buyIntentBundle);
             if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
                 StoreUtils.LogError(TAG, "Unable to buy item, Error response: " + IabResult.getResponseDesc(response));
-
+                
+                IabPurchase failPurchase = new IabPurchase(itemType, "{\"productId\":" + sku + "}", null);
                 result = new IabResult(response, "Unable to buy item");
-                if (listener != null) listener.onIabPurchaseFinished(result, null);
+                if (listener != null) listener.onIabPurchaseFinished(result, failPurchase);
                 // make sure to end the async operation...
                 flagEndAsync();
                 act.finish();
@@ -364,6 +365,12 @@ public class IabHelper {
 
             result = new IabResult(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while starting purchase flow");
             if (listener != null) listener.onIabPurchaseFinished(result, null);
+        } catch (JSONException e) {
+            StoreUtils.LogError(TAG, "Failed to generate failing purchase.");
+            e.printStackTrace();
+            
+            result = new IabResult(IabResult.IABHELPER_BAD_RESPONSE, "Failed to generate failing purchase.");
+            if (mPurchaseListener != null) mPurchaseListener.onIabPurchaseFinished(result, null);
         }
     }
 
@@ -649,7 +656,7 @@ public class IabHelper {
          * @param purchase The purchase that was (or was to be) consumed.
          * @param result The result of the consumption operation.
          */
-        public void onConsumeFinished(Purchase purchase, IabResult result);
+        public void onConsumeFinished(IabPurchase purchase, IabResult result);
     }
 
     /**
@@ -686,7 +693,7 @@ public class IabHelper {
      * @param purchases The list of PurchaseInfo objects representing the purchases to consume.
      * @param listener The listener to notify when the consumption operation finishes.
      */
-    public void consumeAsync(List<Purchase> purchases, OnConsumeMultiFinishedListener listener) {
+    public void consumeAsync(List<IabPurchase> purchases, OnConsumeMultiFinishedListener listener) {
         checkSetupDone("consume");
         consumeAsyncInternal(purchases, null, listener);
     }
@@ -770,7 +777,7 @@ public class IabHelper {
                     || !ownedItems.containsKey(RESPONSE_INAPP_PURCHASE_DATA_LIST)
                     || !ownedItems.containsKey(RESPONSE_INAPP_SIGNATURE_LIST)) {
                 StoreUtils.LogError(TAG, "Bundle returned from getPurchases() doesn't contain required fields.");
-                return IABHELPER_BAD_RESPONSE;
+                return IabResult.IABHELPER_BAD_RESPONSE;
             }
 
             ArrayList<String> ownedSkus = ownedItems.getStringArrayList(
@@ -839,7 +846,7 @@ public class IabHelper {
             }
             else {
             	StoreUtils.LogError(TAG, "getSkuDetails() returned a bundle with neither an error nor a detail list.");
-                return IABHELPER_BAD_RESPONSE;
+                return IabResult.IABHELPER_BAD_RESPONSE;
             }
         }
 
