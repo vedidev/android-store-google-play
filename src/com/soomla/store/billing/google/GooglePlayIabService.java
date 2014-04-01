@@ -25,7 +25,10 @@ import com.soomla.store.billing.IabException;
 import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
+import com.soomla.store.billing.IabSkuDetails;
+import com.soomla.store.data.StoreInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class GooglePlayIabService implements IIabService {
@@ -126,6 +129,7 @@ public class GooglePlayIabService implements IIabService {
     }
 
 
+
     /*====================   Private Utility Methods   ====================*/
 
     /**
@@ -210,16 +214,28 @@ public class GooglePlayIabService implements IIabService {
 
         public void onQueryInventoryFinished(IabResult result, IabInventory inventory) {
             StoreUtils.LogDebug(TAG, "Query inventory succeeded");
-            if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK) {
+            if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mQueryInventoryListener != null) {
+                // fetching owned items
                 List<String> itemSkus = inventory.getAllOwnedSkus(IabHelper.ITEM_TYPE_INAPP);
-                for (String sku: itemSkus) {
+                List<IabPurchase> purchases = new ArrayList<IabPurchase>();
+                for (String sku : itemSkus) {
                     IabPurchase purchase = inventory.getPurchase(sku);
-                    if (this.mQueryInventoryListener != null) {
-                        this.mQueryInventoryListener.success(purchase);
+                    purchases.add(purchase);
+                }
+
+                // fetching sku details for ALL product ids
+                List<String> skuList = StoreInfo.getAllProductIds();
+                List<IabSkuDetails> skuDetails = new ArrayList<IabSkuDetails>();
+                for (String sku : skuList) {
+                    IabSkuDetails skuDetail = inventory.getSkuDetails(sku);
+                    if (skuDetail != null) {
+                        skuDetails.add(skuDetail);
                     }
                 }
+
+                this.mQueryInventoryListener.success(purchases, skuDetails);
             } else {
-                StoreUtils.LogError(TAG, "Query inventory error: " + result.getMessage());
+                StoreUtils.LogError(TAG, "Wither mQueryInventoryListener==null OR Query inventory error: " + result.getMessage());
                 if (this.mQueryInventoryListener != null) this.mQueryInventoryListener.fail(result.getMessage());
             }
 
