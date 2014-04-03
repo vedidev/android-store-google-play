@@ -18,6 +18,7 @@ package com.soomla.store.billing.google;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.soomla.example.BuildConfig;
 import com.soomla.store.util.Base64;
 import com.soomla.store.util.Base64DecoderException;
 
@@ -58,6 +59,10 @@ public class Security {
 
         if (TextUtils.isEmpty(signedData) || TextUtils.isEmpty(base64PublicKey) || TextUtils.isEmpty(signature)) {
         	Log.e(TAG, "Purchase verification failed: missing data.");
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "This is a debug build. Allowing empty signatures.");
+                return true;
+            }
             return false;
         }
 
