@@ -224,7 +224,8 @@ public class GooglePlayIabService implements IIabService {
                 }
 
                 // fetching sku details for ALL product ids
-                List<String> skuList = StoreInfo.getAllProductIds();
+//                List<String> skuList = StoreInfo.getAllProductIds(); //these can contain invalid SKUs!
+                List<String> skuList = StoreInfo.getNonConsumableProductIds();
                 List<IabSkuDetails> skuDetails = new ArrayList<IabSkuDetails>();
                 for (String sku : skuList) {
                     IabSkuDetails skuDetail = inventory.getSkuDetails(sku);
