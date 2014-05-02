@@ -23,7 +23,11 @@ import android.content.Intent;
 import android.content.IntentSender.SendIntentException;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
-import android.os.*;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.os.RemoteException;
 import android.text.TextUtils;
 
 import com.android.vending.billing.IInAppBillingService;
@@ -40,7 +44,9 @@ import com.soomla.store.data.ObscuredSharedPreferences;
 import org.json.JSONException;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -76,6 +82,9 @@ import java.util.List;
  *
  */
 public class IabHelper {
+    // uncomment to verify big chunk google bug (over 20)
+//    public static final int SKU_QUERY_MAX_CHUNK_SIZE = 50;
+    public static final int SKU_QUERY_MAX_CHUNK_SIZE = 19;
     private static String TAG = "IabHelper";
 
     // Is setup done?
@@ -824,28 +833,56 @@ public class IabHelper {
     int querySkuDetails(String itemType, IabInventory inv, List<String> moreSkus)
                                 throws RemoteException, JSONException {
         StoreUtils.LogDebug(TAG, "Querying SKU details.");
-        ArrayList<String> skuList = new ArrayList<String>();
-        skuList.addAll(inv.getAllOwnedSkus(itemType));
-        if (moreSkus != null) skuList.addAll(moreSkus);
+
+        // a list here is a bug no matter what, there is no point in
+        // querying duplicates, and it can only create other bugs
+        // on top of degrading performance
+        // however, we need a subList later for chunks, so just
+        // make the list through a Set 'filter'
+        Set<String> skuSet = new HashSet<String>();
+        skuSet.addAll(inv.getAllOwnedSkus());
+        if (moreSkus != null) skuSet.addAll(moreSkus);
+        ArrayList<String> skuList = new ArrayList<String>(skuSet);
 
         if (skuList.size() == 0) {
             StoreUtils.LogDebug(TAG, "queryPrices: nothing to do because there are no SKUs.");
             return IabResult.BILLING_RESPONSE_RESULT_OK;
         }
 
+        // see: http://stackoverflow.com/a/21080893/1469004
+        int chunkIndex = 1;
+        while (skuList.size() > 0) {
+            ArrayList<String> skuSubList = new ArrayList<String>(
+                    skuList.subList(0, Math.min(SKU_QUERY_MAX_CHUNK_SIZE, skuList.size())));
+            skuList.removeAll(skuSubList);
+            final int chunkResponse = querySkuDetailsChunk(itemType, inv, skuSubList);
+            if (chunkResponse != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                // todo: TBD skip chunk or abort?
+                // for now aborting at that point
+                StoreUtils.LogDebug(TAG, String.format("querySkuDetails[chunk=%d] failed: %s",
+                        chunkIndex, IabResult.getResponseDesc(chunkResponse)));
+                return chunkResponse; // ABORT
+            }
+            chunkIndex++;
+        }
+
+        return IabResult.BILLING_RESPONSE_RESULT_OK;
+    }
+
+    private int querySkuDetailsChunk(String itemType, IabInventory inv, ArrayList<String> chunkSkuList) throws RemoteException, JSONException {
         Bundle querySkus = new Bundle();
-        querySkus.putStringArrayList(GET_SKU_DETAILS_ITEM_LIST, skuList);
+        querySkus.putStringArrayList(GET_SKU_DETAILS_ITEM_LIST, chunkSkuList);
         Bundle skuDetails = mService.getSkuDetails(3, SoomlaApp.getAppContext().getPackageName(),
                 itemType, querySkus);
 
         if (!skuDetails.containsKey(RESPONSE_GET_SKU_DETAILS_LIST)) {
         	int response = getResponseCodeFromBundle(skuDetails);
             if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                StoreUtils.LogDebug(TAG, "getSkuDetails() failed: " + IabResult.getResponseDesc(response));
+                StoreUtils.LogDebug(TAG, "querySkuDetailsChunk() failed: " + IabResult.getResponseDesc(response));
                 return response;
             }
             else {
-            	StoreUtils.LogError(TAG, "getSkuDetails() returned a bundle with neither an error nor a detail list.");
+            	StoreUtils.LogError(TAG, "querySkuDetailsChunk() returned a bundle with neither an error nor a detail list.");
                 return IabResult.IABHELPER_BAD_RESPONSE;
             }
         }
@@ -858,6 +895,7 @@ public class IabHelper {
             StoreUtils.LogDebug(TAG, "Got sku details: " + d);
             inv.addSkuDetails(d);
         }
+
         return IabResult.BILLING_RESPONSE_RESULT_OK;
     }
 
