@@ -26,6 +26,7 @@ import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.billing.IabSkuDetails;
+import com.soomla.store.data.StoreInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -222,11 +223,11 @@ public class GooglePlayIabService implements IIabService {
                     purchases.add(purchase);
                 }
 
-                // fetching sku details for ALL product ids
-                // @lassic (May 1st): actually, HERE it only makes sense to get the details
+                // @lassic (May 1st): actually, HERE (query finished) it only makes sense to get the details
                 // of the SKUs we already queried for. This also enables a weaker dependency
                 // from this module back to Soomla APIs (StoreInfo)
                 List<String> skuList = inventory.getAllQueriedSkus(false);
+
                 List<IabSkuDetails> skuDetails = new ArrayList<IabSkuDetails>();
                 for (String sku : skuList) {
                     IabSkuDetails skuDetail = inventory.getSkuDetails(sku);
