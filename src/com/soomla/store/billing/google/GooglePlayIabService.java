@@ -223,9 +223,9 @@ public class GooglePlayIabService implements IIabService {
                     purchases.add(purchase);
                 }
 
-                // fetching sku details for ALL product ids
-//                List<String> skuList = StoreInfo.getAllProductIds(); //these can contain invalid SKUs!
-                List<String> skuList = StoreInfo.getNonConsumableProductIds();
+                // @lassic (May 1st): actually, here (query finished) it only makes sense to get the details
+                // of the SKUs we already queried for
+                List<String> skuList = inventory.getAllQueriedSkus(false);
                 List<IabSkuDetails> skuDetails = new ArrayList<IabSkuDetails>();
                 for (String sku : skuList) {
                     IabSkuDetails skuDetail = inventory.getSkuDetails(sku);
