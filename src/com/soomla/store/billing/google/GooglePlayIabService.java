@@ -62,13 +62,14 @@ public class GooglePlayIabService implements IIabService {
     }
 
     @Override
-    public void queryInventoryAsync(boolean querySkuDetails,
-                                    List<String> moreSkus,
-                                    IabCallbacks.OnQueryInventoryListener queryInventoryListener) {
-
-        mHelper.queryInventoryAsync(querySkuDetails, moreSkus, new QueryInventoryFinishedListener(queryInventoryListener));
+    public void restorePurchasesAsync(IabCallbacks.OnRestorePurchasesListener restorePurchasesListener) {
+        mHelper.restorePurchasesAsync(new RestorePurchasesFinishedListener(restorePurchasesListener));
     }
 
+    @Override
+    public void fetchSkusDetailsAsync(List<String> skus, IabCallbacks.OnFetchSkusDetailsListener fetchSkusDetailsListener) {
+        mHelper.fetchSkusDetailsAsync(skus, new FetchSkusDetailsFinishedListener(fetchSkusDetailsListener));
+    }
 
     @Override
     public boolean isIabServiceInitialized() {
@@ -201,20 +202,21 @@ public class GooglePlayIabService implements IIabService {
 
 
     /**
-     * Handle incomplete purchase and refund after initialization
+     * Handle Restore Purchases processes
      */
-    private class QueryInventoryFinishedListener implements IabHelper.QueryInventoryFinishedListener {
+    private class RestorePurchasesFinishedListener implements IabHelper.RestorePurchasessFinishedListener {
 
 
-        private IabCallbacks.OnQueryInventoryListener mQueryInventoryListener;
+        private IabCallbacks.OnRestorePurchasesListener mRestorePurchasesListener;
 
-        public QueryInventoryFinishedListener(IabCallbacks.OnQueryInventoryListener queryInventoryListener) {
-            this.mQueryInventoryListener            = queryInventoryListener;
+        public RestorePurchasesFinishedListener(IabCallbacks.OnRestorePurchasesListener restorePurchasesListener) {
+            this.mRestorePurchasesListener            = restorePurchasesListener;
         }
 
-        public void onQueryInventoryFinished(IabResult result, IabInventory inventory) {
-            StoreUtils.LogDebug(TAG, "Query inventory succeeded");
-            if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mQueryInventoryListener != null) {
+        @Override
+        public void onRestorePurchasessFinished(IabResult result, IabInventory inventory) {
+            StoreUtils.LogDebug(TAG, "Restore Purchases succeeded");
+            if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mRestorePurchasesListener != null) {
                 // fetching owned items
                 List<String> itemSkus = inventory.getAllOwnedSkus(IabHelper.ITEM_TYPE_INAPP);
                 List<IabPurchase> purchases = new ArrayList<IabPurchase>();
@@ -222,6 +224,33 @@ public class GooglePlayIabService implements IIabService {
                     IabPurchase purchase = inventory.getPurchase(sku);
                     purchases.add(purchase);
                 }
+
+                this.mRestorePurchasesListener.success(purchases);
+            } else {
+                StoreUtils.LogError(TAG, "Wither mRestorePurchasesListener==null OR Restore purchases error: " + result.getMessage());
+                if (this.mRestorePurchasesListener != null) this.mRestorePurchasesListener.fail(result.getMessage());
+            }
+
+            stopIabHelper(null);
+        }
+    }
+
+    /**
+     * Handle Fetch Skus Details processes
+     */
+    private class FetchSkusDetailsFinishedListener implements IabHelper.FetchSkusDetailsFinishedListener {
+
+
+        private IabCallbacks.OnFetchSkusDetailsListener mFetchSkusDetailsListener;
+
+        public FetchSkusDetailsFinishedListener(IabCallbacks.OnFetchSkusDetailsListener fetchSkusDetailsListener) {
+            this.mFetchSkusDetailsListener            = fetchSkusDetailsListener;
+        }
+
+        @Override
+        public void onFetchSkusDetailsFinished(IabResult result, IabInventory inventory) {
+            StoreUtils.LogDebug(TAG, "Restore Purchases succeeded");
+            if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mFetchSkusDetailsListener != null) {
 
                 // @lassic (May 1st): actually, here (query finished) it only makes sense to get the details
                 // of the SKUs we already queried for
@@ -234,10 +263,10 @@ public class GooglePlayIabService implements IIabService {
                     }
                 }
 
-                this.mQueryInventoryListener.success(purchases, skuDetails);
+                this.mFetchSkusDetailsListener.success(skuDetails);
             } else {
-                StoreUtils.LogError(TAG, "Wither mQueryInventoryListener==null OR Query inventory error: " + result.getMessage());
-                if (this.mQueryInventoryListener != null) this.mQueryInventoryListener.fail(result.getMessage());
+                StoreUtils.LogError(TAG, "Wither mFetchSkusDetailsListener==null OR Fetching details error: " + result.getMessage());
+                if (this.mFetchSkusDetailsListener != null) this.mFetchSkusDetailsListener.fail(result.getMessage());
             }
 
             stopIabHelper(null);

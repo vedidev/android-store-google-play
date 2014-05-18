@@ -492,8 +492,22 @@ public class IabHelper {
         return true;
     }
 
-    public IabInventory queryInventory(boolean querySkuDetails, List<String> moreSkus) throws IabException {
-        return queryInventory(querySkuDetails, moreSkus, null);
+    public IabInventory restorePurchases() throws IabException {
+        checkSetupDone("restorePurchases");
+        try {
+            IabInventory inv = new IabInventory();
+            int r = queryPurchases(inv, ITEM_TYPE_INAPP);
+            if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                throw new IabException(r, "Error refreshing inventory (querying owned items).");
+            }
+            return inv;
+        }
+        catch (RemoteException e) {
+            throw new IabException(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while refreshing inventory.", e);
+        }
+        catch (JSONException e) {
+            throw new IabException(IabResult.IABHELPER_BAD_RESPONSE, "Error parsing JSON response while refreshing inventory.", e);
+        }
     }
 
     /**
@@ -501,44 +515,17 @@ public class IabHelper {
      * information on additional skus, if specified. This method may block or take long to execute.
      * Do not call from a UI thread. For that, use the non-blocking version {@link #queryInventoryAsync}.
      *
-     * @param querySkuDetails if true, SKU details (price, description, etc) will be queried as well
-     *     as purchase information.
-     * @param moreItemSkus additional PRODUCT skus to query information on, regardless of ownership.
-     *     Ignored if null or if querySkuDetails is false.
-     * @param moreSubsSkus additional SUBSCRIPTIONS skus to query information on, regardless of ownership.
+     * @param skus additional PRODUCT skus to query information on, regardless of ownership.
      *     Ignored if null or if querySkuDetails is false.
      * @throws IabException if a problem occurs while refreshing the inventory.
      */
-    public IabInventory queryInventory(boolean querySkuDetails, List<String> moreItemSkus,
-                                        List<String> moreSubsSkus) throws IabException {
-        checkSetupDone("queryInventory");
+    public IabInventory fetchSkusDetails(List<String> skus) throws IabException {
+        checkSetupDone("fetchSkusDetails");
         try {
             IabInventory inv = new IabInventory();
-            int r = queryPurchases(inv, ITEM_TYPE_INAPP);
+            int r = querySkuDetails(ITEM_TYPE_INAPP, inv, skus);
             if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                throw new IabException(r, "Error refreshing inventory (querying owned items).");
-            }
-
-            if (querySkuDetails) {
-                r = querySkuDetails(ITEM_TYPE_INAPP, inv, moreItemSkus);
-                if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                    throw new IabException(r, "Error refreshing inventory (querying prices of items).");
-                }
-            }
-
-            // if subscriptions are supported, then also query for subscriptions
-            if (mSubscriptionsSupported) {
-                r = queryPurchases(inv, ITEM_TYPE_SUBS);
-                if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                    throw new IabException(r, "Error refreshing inventory (querying owned subscriptions).");
-                }
-
-                if (querySkuDetails) {
-                    r = querySkuDetails(ITEM_TYPE_SUBS, inv, moreItemSkus);
-                    if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                        throw new IabException(r, "Error refreshing inventory (querying prices of subscriptions).");
-                    }
-                }
+                throw new IabException(r, "Error refreshing inventory (querying prices of items).");
             }
 
             return inv;
@@ -552,41 +539,41 @@ public class IabHelper {
     }
 
     /**
-     * Listener that notifies when an inventory query operation completes.
+     * Listener that notifies when a restore purchases operation completes.
      */
-    public interface QueryInventoryFinishedListener {
+    public interface RestorePurchasessFinishedListener {
         /**
-         * Called to notify that an inventory query operation completed.
+         * Called to notify that an restore purchases operation completed.
          *
          * @param result The result of the operation.
          * @param inv The inventory.
          */
-        public void onQueryInventoryFinished(IabResult result, IabInventory inv);
+        public void onRestorePurchasessFinished(IabResult result, IabInventory inv);
     }
 
-
     /**
-     * Asynchronous wrapper for inventory query. This will perform an inventory
-     * query as described in {@link #queryInventory}, but will do so asynchronously
-     * and call back the specified listener upon completion. This method is safe to
-     * call from a UI thread.
-     *
-     * @param querySkuDetails as in {@link #queryInventory}
-     * @param moreSkus as in {@link #queryInventory}
-     * @param listener The listener to notify when the refresh operation completes.
+     * Listener that notifies when a fetch skus details operation completes.
      */
-    public void queryInventoryAsync(final boolean querySkuDetails,
-                               final List<String> moreSkus,
-                               final QueryInventoryFinishedListener listener) {
+    public interface FetchSkusDetailsFinishedListener {
+        /**
+         * Called to notify that an fetch skus details operation completed.
+         *
+         * @param result The result of the operation.
+         * @param inv The inventory.
+         */
+        public void onFetchSkusDetailsFinished(IabResult result, IabInventory inv);
+    }
+
+    public void restorePurchasesAsync(final RestorePurchasessFinishedListener listener) {
         final Handler handler = new Handler(Looper.getMainLooper());
-        checkSetupDone("queryInventory");
-        flagStartAsync("refresh inventory");
+        checkSetupDone("restorePurchases");
+        flagStartAsync("restore purchases");
         (new Thread(new Runnable() {
             public void run() {
-                IabResult result = new IabResult(IabResult.BILLING_RESPONSE_RESULT_OK, "IabInventory refresh successful.");
+                IabResult result = new IabResult(IabResult.BILLING_RESPONSE_RESULT_OK, "IabInventory restore successful.");
                 IabInventory inv = null;
                 try {
-                    inv = queryInventory(querySkuDetails, moreSkus);
+                    inv = restorePurchases();
                 }
                 catch (IabException ex) {
                     result = ex.getResult();
@@ -598,21 +585,40 @@ public class IabHelper {
                 final IabInventory inv_f = inv;
                 handler.post(new Runnable() {
                     public void run() {
-                        listener.onQueryInventoryFinished(result_f, inv_f);
+                        listener.onRestorePurchasessFinished(result_f, inv_f);
                     }
                 });
             }
         })).start();
     }
 
-    public void queryInventoryAsync(QueryInventoryFinishedListener listener) {
-        queryInventoryAsync(true, null, listener);
-    }
+    public void fetchSkusDetailsAsync(final List<String> skus, final FetchSkusDetailsFinishedListener listener) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        checkSetupDone("fetchSkusDetails");
+        flagStartAsync("fetch skus details");
+        (new Thread(new Runnable() {
+            public void run() {
+                IabResult result = new IabResult(IabResult.BILLING_RESPONSE_RESULT_OK, "IabInventory fetch details successful.");
+                IabInventory inv = null;
+                try {
+                    inv = fetchSkusDetails(skus);
+                }
+                catch (IabException ex) {
+                    result = ex.getResult();
+                }
 
-    public void queryInventoryAsync(boolean querySkuDetails, QueryInventoryFinishedListener listener) {
-        queryInventoryAsync(querySkuDetails, null, listener);
-    }
+                flagEndAsync();
 
+                final IabResult result_f = result;
+                final IabInventory inv_f = inv;
+                handler.post(new Runnable() {
+                    public void run() {
+                        listener.onFetchSkusDetailsFinished(result_f, inv_f);
+                    }
+                });
+            }
+        })).start();
+    }
 
     /**
      * Consumes a given in-app product. Consuming can only be done on an item
@@ -830,7 +836,7 @@ public class IabHelper {
         return verificationFailed ? IabResult.IABHELPER_VERIFICATION_FAILED : IabResult.BILLING_RESPONSE_RESULT_OK;
     }
 
-    int querySkuDetails(String itemType, IabInventory inv, List<String> moreSkus)
+    int querySkuDetails(String itemType, IabInventory inv, List<String> skus)
                                 throws RemoteException, JSONException {
         StoreUtils.LogDebug(TAG, "Querying SKU details.");
 
@@ -839,9 +845,7 @@ public class IabHelper {
         // on top of degrading performance
         // however, we need a subList later for chunks, so just
         // make the list through a Set 'filter'
-        Set<String> skuSet = new HashSet<String>();
-        skuSet.addAll(inv.getAllOwnedSkus());
-        if (moreSkus != null) skuSet.addAll(moreSkus);
+        Set<String> skuSet = new HashSet<String>(skus);
         ArrayList<String> skuList = new ArrayList<String>(skuSet);
 
         if (skuList.size() == 0) {
