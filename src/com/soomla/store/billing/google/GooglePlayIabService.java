@@ -26,7 +26,6 @@ import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.billing.IabSkuDetails;
-import com.soomla.store.data.StoreInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -83,7 +82,7 @@ public class GooglePlayIabService implements IIabService {
 
     @Override
     public void consumeAsync(IabPurchase purchase, final IabCallbacks.OnConsumeListener consumeListener) {
-        mHelper.consumeAsync(purchase, new IabHelper.OnConsumeFinishedListener() {
+        mHelper.consumeAsync(purchase, new GoogleIabHelper.OnConsumeFinishedListener() {
             @Override
             public void onConsumeFinished(IabPurchase purchase, IabResult result) {
                 if(result.isSuccess()) {
@@ -102,7 +101,7 @@ public class GooglePlayIabService implements IIabService {
                                    String sku,
                                    final IabCallbacks.OnPurchaseListener purchaseListener,
                                    String extraData) {
-        mHelper.launchPurchaseFlow(act, sku, Consts.RC_REQUEST, new IabHelper.OnIabPurchaseFinishedListener() {
+        mHelper.launchPurchaseFlow(act, sku, new GoogleIabHelper.OnIabPurchaseFinishedListener() {
             @Override
             public void onIabPurchaseFinished(IabResult result, IabPurchase purchase) {
 
@@ -150,7 +149,7 @@ public class GooglePlayIabService implements IIabService {
         }
 
         StoreUtils.LogDebug(TAG, "Creating IAB helper.");
-        mHelper = new IabHelper();
+        mHelper = new GoogleIabHelper();
 
         StoreUtils.LogDebug(TAG, "IAB helper Starting setup.");
         mHelper.startSetup(onIabSetupFinishedListener);
@@ -204,7 +203,7 @@ public class GooglePlayIabService implements IIabService {
     /**
      * Handle Restore Purchases processes
      */
-    private class RestorePurchasesFinishedListener implements IabHelper.RestorePurchasessFinishedListener {
+    private class RestorePurchasesFinishedListener implements GoogleIabHelper.RestorePurchasessFinishedListener {
 
 
         private IabCallbacks.OnRestorePurchasesListener mRestorePurchasesListener;
@@ -218,7 +217,7 @@ public class GooglePlayIabService implements IIabService {
             StoreUtils.LogDebug(TAG, "Restore Purchases succeeded");
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mRestorePurchasesListener != null) {
                 // fetching owned items
-                List<String> itemSkus = inventory.getAllOwnedSkus(IabHelper.ITEM_TYPE_INAPP);
+                List<String> itemSkus = inventory.getAllOwnedSkus(GoogleIabHelper.ITEM_TYPE_INAPP);
                 List<IabPurchase> purchases = new ArrayList<IabPurchase>();
                 for (String sku : itemSkus) {
                     IabPurchase purchase = inventory.getPurchase(sku);
@@ -238,7 +237,7 @@ public class GooglePlayIabService implements IIabService {
     /**
      * Handle Fetch Skus Details processes
      */
-    private class FetchSkusDetailsFinishedListener implements IabHelper.FetchSkusDetailsFinishedListener {
+    private class FetchSkusDetailsFinishedListener implements GoogleIabHelper.FetchSkusDetailsFinishedListener {
 
 
         private IabCallbacks.OnFetchSkusDetailsListener mFetchSkusDetailsListener;
@@ -274,7 +273,7 @@ public class GooglePlayIabService implements IIabService {
     }
 
 
-    private class OnIabSetupFinishedListener implements IabHelper.OnIabSetupFinishedListener {
+    private class OnIabSetupFinishedListener implements GoogleIabHelper.OnIabSetupFinishedListener {
 
         private IabCallbacks.IabInitListener mIabInitListener;
 
@@ -300,6 +299,6 @@ public class GooglePlayIabService implements IIabService {
 
     /* Private Members */
     private static final String TAG = "SOOMLA GooglePlayIabService";
-    private IabHelper mHelper;
+    private GoogleIabHelper mHelper;
     private boolean keepIabServiceOpen = false;
 }
