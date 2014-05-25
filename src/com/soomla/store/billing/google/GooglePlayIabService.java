@@ -21,7 +21,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 
-import com.soomla.store.BusProvider;
 import com.soomla.store.SoomlaApp;
 import com.soomla.store.StoreConfig;
 import com.soomla.store.StoreController;
@@ -35,7 +34,6 @@ import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.billing.IabSkuDetails;
 import com.soomla.store.data.ObscuredSharedPreferences;
-import com.soomla.store.events.UnexpectedStoreErrorEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -109,7 +107,6 @@ public class GooglePlayIabService implements IIabService {
         } else if (prefs.getString(PUBLICKEY_KEY, "").length() == 0) {
             String err = "publicKey is null or empty. Can't initialize store!!";
             StoreUtils.LogError(TAG, err);
-            BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(err));
         }
     }
 
