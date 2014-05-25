@@ -38,49 +38,76 @@ import com.soomla.store.data.ObscuredSharedPreferences;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * This is the Google Play plugin implementation of IIabService.
+ *
+ * see parent for more docs.
+ */
 public class GooglePlayIabService implements IIabService {
 
-
+    /**
+     * see parent
+     */
+    @Override
     public void initializeBillingService(final IabCallbacks.IabInitListener iabListener) {
 
         // Set up helper for the first time, querying and synchronizing inventory
         startIabHelper(new OnIabSetupFinishedListener(iabListener));
     }
 
-    public void stopBillingService(IabCallbacks.IabInitListener iabListener) {
-        stopIabHelper(iabListener);
-    }
-
+    /**
+     * see parent
+     */
+    @Override
     public void startIabServiceInBg(IabCallbacks.IabInitListener iabListener) {
         keepIabServiceOpen = true;
         startIabHelper(new OnIabSetupFinishedListener(iabListener));
     }
 
+    /**
+     * see parent
+     */
+    @Override
     public void stopIabServiceInBg(IabCallbacks.IabInitListener iabListener) {
         keepIabServiceOpen = false;
         stopIabHelper(iabListener);
     }
 
+    /**
+     * see parent
+     */
     @Override
     public void restorePurchasesAsync(IabCallbacks.OnRestorePurchasesListener restorePurchasesListener) {
         mHelper.restorePurchasesAsync(new RestorePurchasesFinishedListener(restorePurchasesListener));
     }
 
+    /**
+     * see parent
+     */
     @Override
     public void fetchSkusDetailsAsync(List<String> skus, IabCallbacks.OnFetchSkusDetailsListener fetchSkusDetailsListener) {
         mHelper.fetchSkusDetailsAsync(skus, new FetchSkusDetailsFinishedListener(fetchSkusDetailsListener));
     }
 
+    /**
+     * see parent
+     */
     @Override
     public boolean isIabServiceInitialized() {
         return mHelper != null;
     }
 
+    /**
+     * see parent
+     */
     @Override
     public void consume(IabPurchase purchase) throws IabException {
         mHelper.consume(purchase);
     }
 
+    /**
+     * see parent
+     */
     @Override
     public void consumeAsync(IabPurchase purchase, final IabCallbacks.OnConsumeListener consumeListener) {
         mHelper.consumeAsync(purchase, new GoogleIabHelper.OnConsumeFinishedListener() {
@@ -97,6 +124,13 @@ public class GooglePlayIabService implements IIabService {
         });
     }
 
+    /**
+     * Sets the public key for Google Play IAB Service.
+     * This function MUST be called once when the application loads and after StoreController
+     * initializes.
+     *
+     * @param publicKey the public key from the developer console.
+     */
     public void setPublicKey(String publicKey) {
         SharedPreferences prefs = new ObscuredSharedPreferences(SoomlaApp.getAppContext().
                 getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
@@ -111,10 +145,9 @@ public class GooglePlayIabService implements IIabService {
         edit.commit();
     }
 
-    private static final String SKU = "ID#sku";
-    private static final String EXTRA_DATA = "ID#extraData";
-    private IabCallbacks.OnPurchaseListener mSavedOnPurchaseListener = null;
-
+    /**
+     * see parent
+     */
     @Override
     public void launchPurchaseFlow(String sku,
                                    final IabCallbacks.OnPurchaseListener purchaseListener,
@@ -290,7 +323,9 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
-
+    /**
+     * Handle setup billing service process
+     */
     private class OnIabSetupFinishedListener implements IabHelper.OnIabSetupFinishedListener {
 
         private IabCallbacks.IabInitListener mIabInitListener;
@@ -315,6 +350,9 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
+    /**
+     * Handle setup billing purchase process
+     */
     private static class OnIabPurchaseFinishedListener implements IabHelper.OnIabPurchaseFinishedListener {
 
         public OnIabPurchaseFinishedListener() {
@@ -349,12 +387,6 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
-
-
-
-
-
-    private boolean mWaitingServiceResponse = false;
 
     /**
      * Android In-App Billing v3 requires an activity to receive the result of the billing process.
@@ -430,8 +462,13 @@ public class GooglePlayIabService implements IIabService {
     private static final String TAG = "SOOMLA GooglePlayIabService";
     private GoogleIabHelper mHelper;
     private boolean keepIabServiceOpen = false;
+    private boolean mWaitingServiceResponse = false;
 
     public static final String PUBLICKEY_KEY = "PO#SU#SO#GU";
+
+    private static final String SKU = "ID#sku";
+    private static final String EXTRA_DATA = "ID#extraData";
+    private IabCallbacks.OnPurchaseListener mSavedOnPurchaseListener = null;
 
     /**
      * When set to true, this removes the need to verify purchases when there's no signature.

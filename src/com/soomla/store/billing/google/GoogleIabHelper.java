@@ -51,54 +51,17 @@ import java.util.Set;
 
 
 /**
- * Provides convenience methods for in-app billing. You can create one instance of this
- * class for your application and use it to process in-app billing operations.
- * It provides synchronous (blocking) and asynchronous (non-blocking) methods for
- * many common in-app billing operations, as well as automatic signature
- * verification.
+ * This is an implementation of SOOMLA's IabHelper to create a plugin of Google Play to SOOMLA.
  *
- * After instantiating, you must perform setup in order to start using the object.
- * To perform setup, call the {@link #startSetup} method and provide a listener;
- * that listener will be notified when setup is complete, after which (and not before)
- * you may call other methods.
- *
- * After setup is complete, you will typically want to request an inventory of owned
- * items and subscriptions. See {@link #queryInventory}, {@link #queryInventoryAsync}
- * and related methods.
- *
- * When you are done with this object, don't forget to call {@link #dispose}
- * to ensure proper cleanup. This object holds a binding to the in-app billing
- * service, which will leak unless you dispose of it correctly. If you created
- * the object on an Activity's onCreate method, then the recommended
- * place to dispose of it is the Activity's onDestroy method.
- *
- * A note about threading: When using this object from a background thread, you may
- * call the blocking versions of methods; when using from a UI thread, call
- * only the asynchronous versions and handle the results via callbacks.
- * Also, notice that you can only call one asynchronous operation at a time;
- * attempting to start a second asynchronous operation while the first one
- * has not yet completed will result in an exception being thrown.
- *
- * @author Bruno Oliveira (Google)
- *
+ * More docs in parent.
  */
 public class GoogleIabHelper extends IabHelper {
+
     // uncomment to verify big chunk google bug (over 20)
 //    public static final int SKU_QUERY_MAX_CHUNK_SIZE = 50;
+
+
     public static final int SKU_QUERY_MAX_CHUNK_SIZE = 19;
-    private static String TAG = "SOOMLA GoogleIabHelper";
-
-
-
-    // Connection to the service
-    IInAppBillingService mService;
-    ServiceConnection mServiceConn;
-
-    // The item type of the current purchase flow
-    String mPurchasingItemType;
-
-    // The SKU of the item in the current purchase flow
-    String mPurchasingItemSku;
 
     // Keys for the responses from InAppBillingService
     public static final String RESPONSE_CODE = "RESPONSE_CODE";
@@ -123,8 +86,6 @@ public class GoogleIabHelper extends IabHelper {
     public GoogleIabHelper() {
         StoreUtils.LogDebug(TAG, "GoogleIabHelper helper created.");
     }
-
-
 
     /**
      * See parent
@@ -189,63 +150,6 @@ public class GoogleIabHelper extends IabHelper {
             mServiceConn = null;
             mService = null;
         }
-    }
-
-
-
-    private static final int RC_REQUEST = 10001;
-
-    /**
-     * See parent
-     */
-    protected void launchPurchaseFlowInner(Activity act, String sku, String extraData) {
-        IabResult result;
-
-        try {
-            StoreUtils.LogDebug(TAG, "Constructing buy intent for " + sku + ", item type: " + ITEM_TYPE_INAPP);
-            Bundle buyIntentBundle = mService.getBuyIntent(3, SoomlaApp.getAppContext().getPackageName(), sku, ITEM_TYPE_INAPP, extraData);
-            buyIntentBundle.putString("PURCHASE_SKU", sku);
-            int response = getResponseCodeFromBundle(buyIntentBundle);
-            if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                StoreUtils.LogError(TAG, "Unable to buy item, Error response: " + IabResult.getResponseDesc(response));
-
-                IabPurchase failPurchase = new IabPurchase(ITEM_TYPE_INAPP, "{\"productId\":" + sku + "}", null);
-                result = new IabResult(response, "Unable to buy item");
-                purchaseFailed(result, failPurchase);
-                act.finish();
-                return;
-            }
-
-            PendingIntent pendingIntent = buyIntentBundle.getParcelable(RESPONSE_BUY_INTENT);
-            StoreUtils.LogDebug(TAG, "Launching buy intent for " + sku + ". Request code: " + RC_REQUEST);
-            mPurchasingItemSku = sku;
-            mPurchasingItemType = ITEM_TYPE_INAPP;
-
-            act.startIntentSenderForResult(pendingIntent.getIntentSender(),
-                    RC_REQUEST, new Intent(),
-                    Integer.valueOf(0), Integer.valueOf(0),
-                    Integer.valueOf(0));
-        } catch (SendIntentException e) {
-            StoreUtils.LogError(TAG, "SendIntentException while launching purchase flow for sku " + sku);
-            e.printStackTrace();
-
-            result = new IabResult(IabResult.IABHELPER_SEND_INTENT_FAILED, "Failed to send intent.");
-            purchaseFailed(result, null);
-        } catch (RemoteException e) {
-            StoreUtils.LogError(TAG, "RemoteException while launching purchase flow for sku " + sku);
-            e.printStackTrace();
-
-            result = new IabResult(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while starting purchase flow");
-            purchaseFailed(result, null);
-        } catch (JSONException e) {
-            StoreUtils.LogError(TAG, "Failed to generate failing purchase.");
-            e.printStackTrace();
-
-            result = new IabResult(IabResult.IABHELPER_BAD_RESPONSE, "Failed to generate failing purchase.");
-            purchaseFailed(result, null);
-        }
-
-
     }
 
     /**
@@ -350,90 +254,6 @@ public class GoogleIabHelper extends IabHelper {
         return true;
     }
 
-    private IabInventory restorePurchases() throws IabException {
-        checkSetupDoneAndThrow("restorePurchases");
-        try {
-            IabInventory inv = new IabInventory();
-            int r = queryPurchases(inv, ITEM_TYPE_INAPP);
-            if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                throw new IabException(r, "Error refreshing inventory (querying owned items).");
-            }
-            return inv;
-        }
-        catch (RemoteException e) {
-            throw new IabException(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while refreshing inventory.", e);
-        }
-        catch (JSONException e) {
-            throw new IabException(IabResult.IABHELPER_BAD_RESPONSE, "Error parsing JSON response while refreshing inventory.", e);
-        }
-    }
-
-    /**
-     * Queries the inventory. This will query all owned items from the server, as well as
-     * information on additional skus, if specified. This method may block or take long to execute.
-     * Do not call from a UI thread. For that, use the non-blocking version {@link #queryInventoryAsync}.
-     *
-     * @param skus additional PRODUCT skus to query information on, regardless of ownership.
-     *     Ignored if null or if querySkuDetails is false.
-     * @throws IabException if a problem occurs while refreshing the inventory.
-     */
-    private IabInventory fetchSkusDetails(List<String> skus) throws IabException {
-        checkSetupDoneAndThrow("fetchSkusDetails");
-        try {
-            IabInventory inv = new IabInventory();
-            int r = querySkuDetails(ITEM_TYPE_INAPP, inv, skus);
-            if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                throw new IabException(r, "Error refreshing inventory (querying prices of items).");
-            }
-
-            return inv;
-        }
-        catch (RemoteException e) {
-            throw new IabException(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while refreshing inventory.", e);
-        }
-        catch (JSONException e) {
-            throw new IabException(IabResult.IABHELPER_BAD_RESPONSE, "Error parsing JSON response while refreshing inventory.", e);
-        }
-    }
-
-
-
-    protected void restorePurchasesAsyncInner() {
-        (new Thread(new Runnable() {
-            public void run() {
-                IabInventory inv = null;
-                try {
-                    inv = restorePurchases();
-                }
-                catch (IabException ex) {
-                    IabResult result = ex.getResult();
-                    restorePurchasesFailed(result);
-                    return;
-                }
-
-                restorePurchasesSuccess(inv);
-            }
-        })).start();
-    }
-
-    protected void fetchSkusDetailsAsyncInner(final List<String> skus) {
-        (new Thread(new Runnable() {
-            public void run() {
-                IabInventory inv = null;
-                try {
-                    inv = fetchSkusDetails(skus);
-                }
-                catch (IabException ex) {
-                    IabResult result = ex.getResult();
-                    fetchSkusDetailsFailed(result);
-                    return;
-                }
-
-                fetchSkusDetailsSuccess(inv);
-            }
-        })).start();
-    }
-
     /**
      * Consumes a given in-app product. Consuming can only be done on an item
      * that's owned, and as a result of consumption, the user will no longer own it.
@@ -502,179 +322,147 @@ public class GoogleIabHelper extends IabHelper {
         consumeAsyncInternal(purchases, null, listener);
     }
 
-
-    // Workaround to bug where sometimes response codes come as Long instead of Integer
-    int getResponseCodeFromBundle(Bundle b) {
-        Object o = b.get(RESPONSE_CODE);
-        if (o == null) {
-            StoreUtils.LogDebug(TAG, "Bundle with null response code, assuming OK (known issue)");
-            return IabResult.BILLING_RESPONSE_RESULT_OK;
-        }
-        else if (o instanceof Integer) return ((Integer)o).intValue();
-        else if (o instanceof Long) return (int)((Long)o).longValue();
-        else {
-            StoreUtils.LogError(TAG, "Unexpected type for bundle response code.");
-            StoreUtils.LogError(TAG, o.getClass().getName());
-            throw new RuntimeException("Unexpected type for bundle response code: " + o.getClass().getName());
-        }
+    /**
+     * Callback that notifies when a consumption operation finishes.
+     */
+    public interface OnConsumeFinishedListener {
+        /**
+         * Called to notify that a consumption has finished.
+         *
+         * @param purchase The purchase that was (or was to be) consumed.
+         * @param result The result of the consumption operation.
+         */
+        public void onConsumeFinished(IabPurchase purchase, IabResult result);
     }
 
-    // Workaround to bug where sometimes response codes come as Long instead of Integer
-    int getResponseCodeFromIntent(Intent i) {
-        Object o = i.getExtras().get(RESPONSE_CODE);
-        if (o == null) {
-            StoreUtils.LogError(TAG, "Intent with no response code, assuming OK (known issue)");
-            return IabResult.BILLING_RESPONSE_RESULT_OK;
-        }
-        else if (o instanceof Integer) return ((Integer)o).intValue();
-        else if (o instanceof Long) return (int)((Long)o).longValue();
-        else {
-            StoreUtils.LogError(TAG, "Unexpected type for intent response code.");
-            StoreUtils.LogError(TAG, o.getClass().getName());
-            throw new RuntimeException("Unexpected type for intent response code: " + o.getClass().getName());
-        }
+    /**
+     * Callback that notifies when a multi-item consumption operation finishes.
+     */
+    public interface OnConsumeMultiFinishedListener {
+        /**
+         * Called to notify that a consumption of multiple items has finished.
+         *
+         * @param purchases The purchases that were (or were to be) consumed.
+         * @param results The results of each consumption operation, corresponding to each
+         *     sku.
+         */
+        public void onConsumeMultiFinished(List<IabPurchase> purchases, List<IabResult> results);
     }
 
 
+    /** Protected functions **/
 
-
-
-    private int queryPurchases(IabInventory inv, String itemType) throws JSONException, RemoteException {
-        // Query purchases
-        StoreUtils.LogDebug(TAG, "Querying owned items, item type: " + itemType);
-        StoreUtils.LogDebug(TAG, "Package name: " + SoomlaApp.getAppContext().getPackageName());
-        boolean verificationFailed = false;
-        String continueToken = null;
-
-        do {
-            StoreUtils.LogDebug(TAG, "Calling getPurchases with continuation token: " + continueToken);
-            Bundle ownedItems = mService.getPurchases(3, SoomlaApp.getAppContext().getPackageName(),
-                    itemType, continueToken);
-
-            int response = getResponseCodeFromBundle(ownedItems);
-            StoreUtils.LogDebug(TAG, "Owned items response: " + String.valueOf(response));
-            if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                StoreUtils.LogDebug(TAG, "getPurchases() failed: " + IabResult.getResponseDesc(response));
-                return response;
-            }
-            if (!ownedItems.containsKey(RESPONSE_INAPP_ITEM_LIST)
-                    || !ownedItems.containsKey(RESPONSE_INAPP_PURCHASE_DATA_LIST)
-                    || !ownedItems.containsKey(RESPONSE_INAPP_SIGNATURE_LIST)) {
-                StoreUtils.LogError(TAG, "Bundle returned from getPurchases() doesn't contain required fields.");
-                return IabResult.IABHELPER_BAD_RESPONSE;
-            }
-
-            ArrayList<String> ownedSkus = ownedItems.getStringArrayList(
-                        RESPONSE_INAPP_ITEM_LIST);
-            ArrayList<String> purchaseDataList = ownedItems.getStringArrayList(
-                        RESPONSE_INAPP_PURCHASE_DATA_LIST);
-            ArrayList<String> signatureList = ownedItems.getStringArrayList(
-                        RESPONSE_INAPP_SIGNATURE_LIST);
-
-            SharedPreferences prefs = new ObscuredSharedPreferences(
-                    SoomlaApp.getAppContext().getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
-            String publicKey = prefs.getString(GooglePlayIabService.PUBLICKEY_KEY, "");
-            for (int i = 0; i < purchaseDataList.size(); ++i) {
-                String purchaseData = purchaseDataList.get(i);
-                String signature = signatureList.get(i);
-                String sku = ownedSkus.get(i);
-                if (Security.verifyPurchase(publicKey, purchaseData, signature)) {
-                    StoreUtils.LogDebug(TAG, "Sku is owned: " + sku);
-                    IabPurchase purchase = new IabPurchase(itemType, purchaseData, signature);
-
-                    if (TextUtils.isEmpty(purchase.getToken())) {
-                        StoreUtils.LogWarning(TAG, "BUG: empty/null token!");
-                        StoreUtils.LogDebug(TAG, "IabPurchase data: " + purchaseData);
-                    }
-
-                    // Record ownership and token
-                    inv.addPurchase(purchase);
+    /**
+     * see parent
+     */
+    @Override
+    protected void restorePurchasesAsyncInner() {
+        (new Thread(new Runnable() {
+            public void run() {
+                IabInventory inv = null;
+                try {
+                    inv = restorePurchases();
                 }
-                else {
-                    StoreUtils.LogWarning(TAG, "IabPurchase signature verification **FAILED**. Not adding item.");
-                    StoreUtils.LogDebug(TAG, "   IabPurchase data: " + purchaseData);
-                    StoreUtils.LogDebug(TAG, "   Signature: " + signature);
-                    verificationFailed = true;
+                catch (IabException ex) {
+                    IabResult result = ex.getResult();
+                    restorePurchasesFailed(result);
+                    return;
                 }
+
+                restorePurchasesSuccess(inv);
             }
-
-            continueToken = ownedItems.getString(INAPP_CONTINUATION_TOKEN);
-            StoreUtils.LogDebug(TAG, "Continuation token: " + continueToken);
-        } while (!TextUtils.isEmpty(continueToken));
-
-        return verificationFailed ? IabResult.IABHELPER_VERIFICATION_FAILED : IabResult.BILLING_RESPONSE_RESULT_OK;
+        })).start();
     }
 
-    private int querySkuDetails(String itemType, IabInventory inv, List<String> skus)
-                                throws RemoteException, JSONException {
-        StoreUtils.LogDebug(TAG, "Querying SKU details.");
+    /**
+     * see parent
+     */
+    @Override
+    protected void fetchSkusDetailsAsyncInner(final List<String> skus) {
+        (new Thread(new Runnable() {
+            public void run() {
+                IabInventory inv = null;
+                try {
+                    inv = fetchSkusDetails(skus);
+                }
+                catch (IabException ex) {
+                    IabResult result = ex.getResult();
+                    fetchSkusDetailsFailed(result);
+                    return;
+                }
 
-        // a list here is a bug no matter what, there is no point in
-        // querying duplicates, and it can only create other bugs
-        // on top of degrading performance
-        // however, we need a subList later for chunks, so just
-        // make the list through a Set 'filter'
-        Set<String> skuSet = new HashSet<String>(skus);
-        ArrayList<String> skuList = new ArrayList<String>(skuSet);
-
-        if (skuList.size() == 0) {
-            StoreUtils.LogDebug(TAG, "queryPrices: nothing to do because there are no SKUs.");
-            return IabResult.BILLING_RESPONSE_RESULT_OK;
-        }
-
-        // see: http://stackoverflow.com/a/21080893/1469004
-        int chunkIndex = 1;
-        while (skuList.size() > 0) {
-            ArrayList<String> skuSubList = new ArrayList<String>(
-                    skuList.subList(0, Math.min(SKU_QUERY_MAX_CHUNK_SIZE, skuList.size())));
-            skuList.removeAll(skuSubList);
-            final int chunkResponse = querySkuDetailsChunk(itemType, inv, skuSubList);
-            if (chunkResponse != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                // todo: TBD skip chunk or abort?
-                // for now aborting at that point
-                StoreUtils.LogDebug(TAG, String.format("querySkuDetails[chunk=%d] failed: %s",
-                        chunkIndex, IabResult.getResponseDesc(chunkResponse)));
-                return chunkResponse; // ABORT
+                fetchSkusDetailsSuccess(inv);
             }
-            chunkIndex++;
-        }
-
-        return IabResult.BILLING_RESPONSE_RESULT_OK;
+        })).start();
     }
 
-    private int querySkuDetailsChunk(String itemType, IabInventory inv, ArrayList<String> chunkSkuList) throws RemoteException, JSONException {
-        Bundle querySkus = new Bundle();
-        querySkus.putStringArrayList(GET_SKU_DETAILS_ITEM_LIST, chunkSkuList);
-        Bundle skuDetails = mService.getSkuDetails(3, SoomlaApp.getAppContext().getPackageName(),
-                itemType, querySkus);
+    /**
+     * See parent
+     */
+    @Override
+    protected void launchPurchaseFlowInner(Activity act, String sku, String extraData) {
+        IabResult result;
 
-        if (!skuDetails.containsKey(RESPONSE_GET_SKU_DETAILS_LIST)) {
-        	int response = getResponseCodeFromBundle(skuDetails);
+        try {
+            StoreUtils.LogDebug(TAG, "Constructing buy intent for " + sku + ", item type: " + ITEM_TYPE_INAPP);
+            Bundle buyIntentBundle = mService.getBuyIntent(3, SoomlaApp.getAppContext().getPackageName(), sku, ITEM_TYPE_INAPP, extraData);
+            buyIntentBundle.putString("PURCHASE_SKU", sku);
+            int response = getResponseCodeFromBundle(buyIntentBundle);
             if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                StoreUtils.LogDebug(TAG, "querySkuDetailsChunk() failed: " + IabResult.getResponseDesc(response));
-                return response;
+                StoreUtils.LogError(TAG, "Unable to buy item, Error response: " + IabResult.getResponseDesc(response));
+
+                IabPurchase failPurchase = new IabPurchase(ITEM_TYPE_INAPP, "{\"productId\":" + sku + "}", null);
+                result = new IabResult(response, "Unable to buy item");
+                purchaseFailed(result, failPurchase);
+                act.finish();
+                return;
             }
-            else {
-            	StoreUtils.LogError(TAG, "querySkuDetailsChunk() returned a bundle with neither an error nor a detail list.");
-                return IabResult.IABHELPER_BAD_RESPONSE;
-            }
+
+            PendingIntent pendingIntent = buyIntentBundle.getParcelable(RESPONSE_BUY_INTENT);
+            StoreUtils.LogDebug(TAG, "Launching buy intent for " + sku + ". Request code: " + RC_REQUEST);
+            mPurchasingItemSku = sku;
+            mPurchasingItemType = ITEM_TYPE_INAPP;
+
+            act.startIntentSenderForResult(pendingIntent.getIntentSender(),
+                    RC_REQUEST, new Intent(),
+                    Integer.valueOf(0), Integer.valueOf(0),
+                    Integer.valueOf(0));
+        } catch (SendIntentException e) {
+            StoreUtils.LogError(TAG, "SendIntentException while launching purchase flow for sku " + sku);
+            e.printStackTrace();
+
+            result = new IabResult(IabResult.IABHELPER_SEND_INTENT_FAILED, "Failed to send intent.");
+            purchaseFailed(result, null);
+        } catch (RemoteException e) {
+            StoreUtils.LogError(TAG, "RemoteException while launching purchase flow for sku " + sku);
+            e.printStackTrace();
+
+            result = new IabResult(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while starting purchase flow");
+            purchaseFailed(result, null);
+        } catch (JSONException e) {
+            StoreUtils.LogError(TAG, "Failed to generate failing purchase.");
+            e.printStackTrace();
+
+            result = new IabResult(IabResult.IABHELPER_BAD_RESPONSE, "Failed to generate failing purchase.");
+            purchaseFailed(result, null);
         }
 
-        ArrayList<String> responseList = skuDetails.getStringArrayList(
-                RESPONSE_GET_SKU_DETAILS_LIST);
 
-        for (String thisResponse : responseList) {
-            IabSkuDetails d = new IabSkuDetails(itemType, thisResponse);
-            StoreUtils.LogDebug(TAG, "Got sku details: " + d);
-            inv.addSkuDetails(d);
-        }
-
-        return IabResult.BILLING_RESPONSE_RESULT_OK;
     }
 
+
+    /** Private functions **/
+
+    /**
+     * The inner functions that consumes purchases.
+     *
+     * @param purchases the purchases to consume.
+     * @param singleListener The listener to invoke when the consumption completes.
+     * @param multiListener Multi listener for when we have multiple consumption operations.
+     */
     private void consumeAsyncInternal(final List<IabPurchase> purchases,
-                              final OnConsumeFinishedListener singleListener,
-                              final OnConsumeMultiFinishedListener multiListener) {
+                                      final OnConsumeFinishedListener singleListener,
+                                      final OnConsumeMultiFinishedListener multiListener) {
         final Handler handler = new Handler();
         flagStartAsync("consume");
         (new Thread(new Runnable() {
@@ -710,30 +498,255 @@ public class GoogleIabHelper extends IabHelper {
     }
 
     /**
-     * Callback that notifies when a consumption operation finishes.
+     * Queries the inventory. This will query specified skus' details from the server.
+     *
+     * @param skus additional PRODUCT skus to query information on, regardless of ownership.
+     *     Ignored if null or if querySkuDetails is false.
+     * @throws IabException if a problem occurs while refreshing the inventory.
      */
-    public interface OnConsumeFinishedListener {
-        /**
-         * Called to notify that a consumption has finished.
-         *
-         * @param purchase The purchase that was (or was to be) consumed.
-         * @param result The result of the consumption operation.
-         */
-        public void onConsumeFinished(IabPurchase purchase, IabResult result);
+    private IabInventory fetchSkusDetails(List<String> skus) throws IabException {
+        checkSetupDoneAndThrow("fetchSkusDetails");
+        try {
+            IabInventory inv = new IabInventory();
+            int r = querySkuDetails(ITEM_TYPE_INAPP, inv, skus);
+            if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                throw new IabException(r, "Error refreshing inventory (querying prices of items).");
+            }
+
+            return inv;
+        }
+        catch (RemoteException e) {
+            throw new IabException(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while refreshing inventory.", e);
+        }
+        catch (JSONException e) {
+            throw new IabException(IabResult.IABHELPER_BAD_RESPONSE, "Error parsing JSON response while refreshing inventory.", e);
+        }
     }
 
     /**
-     * Callback that notifies when a multi-item consumption operation finishes.
+     * Restores purchases from Google Play.
+     *
+     * @throws JSONException
+     * @throws RemoteException
      */
-    public interface OnConsumeMultiFinishedListener {
-        /**
-         * Called to notify that a consumption of multiple items has finished.
-         *
-         * @param purchases The purchases that were (or were to be) consumed.
-         * @param results The results of each consumption operation, corresponding to each
-         *     sku.
-         */
-        public void onConsumeMultiFinished(List<IabPurchase> purchases, List<IabResult> results);
+    private int queryPurchases(IabInventory inv, String itemType) throws JSONException, RemoteException {
+        // Query purchases
+        StoreUtils.LogDebug(TAG, "Querying owned items, item type: " + itemType);
+        StoreUtils.LogDebug(TAG, "Package name: " + SoomlaApp.getAppContext().getPackageName());
+        boolean verificationFailed = false;
+        String continueToken = null;
+
+        do {
+            StoreUtils.LogDebug(TAG, "Calling getPurchases with continuation token: " + continueToken);
+            Bundle ownedItems = mService.getPurchases(3, SoomlaApp.getAppContext().getPackageName(),
+                    itemType, continueToken);
+
+            int response = getResponseCodeFromBundle(ownedItems);
+            StoreUtils.LogDebug(TAG, "Owned items response: " + String.valueOf(response));
+            if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                StoreUtils.LogDebug(TAG, "getPurchases() failed: " + IabResult.getResponseDesc(response));
+                return response;
+            }
+            if (!ownedItems.containsKey(RESPONSE_INAPP_ITEM_LIST)
+                    || !ownedItems.containsKey(RESPONSE_INAPP_PURCHASE_DATA_LIST)
+                    || !ownedItems.containsKey(RESPONSE_INAPP_SIGNATURE_LIST)) {
+                StoreUtils.LogError(TAG, "Bundle returned from getPurchases() doesn't contain required fields.");
+                return IabResult.IABHELPER_BAD_RESPONSE;
+            }
+
+            ArrayList<String> ownedSkus = ownedItems.getStringArrayList(
+                    RESPONSE_INAPP_ITEM_LIST);
+            ArrayList<String> purchaseDataList = ownedItems.getStringArrayList(
+                    RESPONSE_INAPP_PURCHASE_DATA_LIST);
+            ArrayList<String> signatureList = ownedItems.getStringArrayList(
+                    RESPONSE_INAPP_SIGNATURE_LIST);
+
+            SharedPreferences prefs = new ObscuredSharedPreferences(
+                    SoomlaApp.getAppContext().getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
+            String publicKey = prefs.getString(GooglePlayIabService.PUBLICKEY_KEY, "");
+            for (int i = 0; i < purchaseDataList.size(); ++i) {
+                String purchaseData = purchaseDataList.get(i);
+                String signature = signatureList.get(i);
+                String sku = ownedSkus.get(i);
+                if (Security.verifyPurchase(publicKey, purchaseData, signature)) {
+                    StoreUtils.LogDebug(TAG, "Sku is owned: " + sku);
+                    IabPurchase purchase = new IabPurchase(itemType, purchaseData, signature);
+
+                    if (TextUtils.isEmpty(purchase.getToken())) {
+                        StoreUtils.LogWarning(TAG, "BUG: empty/null token!");
+                        StoreUtils.LogDebug(TAG, "IabPurchase data: " + purchaseData);
+                    }
+
+                    // Record ownership and token
+                    inv.addPurchase(purchase);
+                }
+                else {
+                    StoreUtils.LogWarning(TAG, "IabPurchase signature verification **FAILED**. Not adding item.");
+                    StoreUtils.LogDebug(TAG, "   IabPurchase data: " + purchaseData);
+                    StoreUtils.LogDebug(TAG, "   Signature: " + signature);
+                    verificationFailed = true;
+                }
+            }
+
+            continueToken = ownedItems.getString(INAPP_CONTINUATION_TOKEN);
+            StoreUtils.LogDebug(TAG, "Continuation token: " + continueToken);
+        } while (!TextUtils.isEmpty(continueToken));
+
+        return verificationFailed ? IabResult.IABHELPER_VERIFICATION_FAILED : IabResult.BILLING_RESPONSE_RESULT_OK;
     }
+
+    /**
+     * Retrieves all items that were purchase but not consumed.
+     *
+     * @throws IabException
+     */
+    private IabInventory restorePurchases() throws IabException {
+        checkSetupDoneAndThrow("restorePurchases");
+        try {
+            IabInventory inv = new IabInventory();
+            int r = queryPurchases(inv, ITEM_TYPE_INAPP);
+            if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                throw new IabException(r, "Error refreshing inventory (querying owned items).");
+            }
+            return inv;
+        }
+        catch (RemoteException e) {
+            throw new IabException(IabResult.IABHELPER_REMOTE_EXCEPTION, "Remote exception while refreshing inventory.", e);
+        }
+        catch (JSONException e) {
+            throw new IabException(IabResult.IABHELPER_BAD_RESPONSE, "Error parsing JSON response while refreshing inventory.", e);
+        }
+    }
+
+    /**
+     * Fetches items details for a given list of items.
+     *
+     * @throws RemoteException
+     * @throws JSONException
+     */
+    private int querySkuDetails(String itemType, IabInventory inv, List<String> skus)
+            throws RemoteException, JSONException {
+        StoreUtils.LogDebug(TAG, "Querying SKU details.");
+
+        // a list here is a bug no matter what, there is no point in
+        // querying duplicates, and it can only create other bugs
+        // on top of degrading performance
+        // however, we need a subList later for chunks, so just
+        // make the list through a Set 'filter'
+        Set<String> skuSet = new HashSet<String>(skus);
+        ArrayList<String> skuList = new ArrayList<String>(skuSet);
+
+        if (skuList.size() == 0) {
+            StoreUtils.LogDebug(TAG, "queryPrices: nothing to do because there are no SKUs.");
+            return IabResult.BILLING_RESPONSE_RESULT_OK;
+        }
+
+        // see: http://stackoverflow.com/a/21080893/1469004
+        int chunkIndex = 1;
+        while (skuList.size() > 0) {
+            ArrayList<String> skuSubList = new ArrayList<String>(
+                    skuList.subList(0, Math.min(SKU_QUERY_MAX_CHUNK_SIZE, skuList.size())));
+            skuList.removeAll(skuSubList);
+            final int chunkResponse = querySkuDetailsChunk(itemType, inv, skuSubList);
+            if (chunkResponse != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                // todo: TBD skip chunk or abort?
+                // for now aborting at that point
+                StoreUtils.LogDebug(TAG, String.format("querySkuDetails[chunk=%d] failed: %s",
+                        chunkIndex, IabResult.getResponseDesc(chunkResponse)));
+                return chunkResponse; // ABORT
+            }
+            chunkIndex++;
+        }
+
+        return IabResult.BILLING_RESPONSE_RESULT_OK;
+    }
+
+    /**
+     * Queries a chunk of SKU details to prevent Google's 20 items bug.
+     *
+     * @throws RemoteException
+     * @throws JSONException
+     */
+    private int querySkuDetailsChunk(String itemType, IabInventory inv, ArrayList<String> chunkSkuList) throws RemoteException, JSONException {
+        Bundle querySkus = new Bundle();
+        querySkus.putStringArrayList(GET_SKU_DETAILS_ITEM_LIST, chunkSkuList);
+        Bundle skuDetails = mService.getSkuDetails(3, SoomlaApp.getAppContext().getPackageName(),
+                itemType, querySkus);
+
+        if (!skuDetails.containsKey(RESPONSE_GET_SKU_DETAILS_LIST)) {
+            int response = getResponseCodeFromBundle(skuDetails);
+            if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                StoreUtils.LogDebug(TAG, "querySkuDetailsChunk() failed: " + IabResult.getResponseDesc(response));
+                return response;
+            }
+            else {
+                StoreUtils.LogError(TAG, "querySkuDetailsChunk() returned a bundle with neither an error nor a detail list.");
+                return IabResult.IABHELPER_BAD_RESPONSE;
+            }
+        }
+
+        ArrayList<String> responseList = skuDetails.getStringArrayList(
+                RESPONSE_GET_SKU_DETAILS_LIST);
+
+        for (String thisResponse : responseList) {
+            IabSkuDetails d = new IabSkuDetails(itemType, thisResponse);
+            StoreUtils.LogDebug(TAG, "Got sku details: " + d);
+            inv.addSkuDetails(d);
+        }
+
+        return IabResult.BILLING_RESPONSE_RESULT_OK;
+    }
+
+    /**
+     * Workaround to bug where sometimes response codes come as Long instead of Integer
+     */
+    private int getResponseCodeFromBundle(Bundle b) {
+        Object o = b.get(RESPONSE_CODE);
+        if (o == null) {
+            StoreUtils.LogDebug(TAG, "Bundle with null response code, assuming OK (known issue)");
+            return IabResult.BILLING_RESPONSE_RESULT_OK;
+        }
+        else if (o instanceof Integer) return ((Integer)o).intValue();
+        else if (o instanceof Long) return (int)((Long)o).longValue();
+        else {
+            StoreUtils.LogError(TAG, "Unexpected type for bundle response code.");
+            StoreUtils.LogError(TAG, o.getClass().getName());
+            throw new RuntimeException("Unexpected type for bundle response code: " + o.getClass().getName());
+        }
+    }
+
+    /**
+     * Workaround to bug where sometimes response codes come as Long instead of Integer
+     */
+    private int getResponseCodeFromIntent(Intent i) {
+        Object o = i.getExtras().get(RESPONSE_CODE);
+        if (o == null) {
+            StoreUtils.LogError(TAG, "Intent with no response code, assuming OK (known issue)");
+            return IabResult.BILLING_RESPONSE_RESULT_OK;
+        }
+        else if (o instanceof Integer) return ((Integer)o).intValue();
+        else if (o instanceof Long) return (int)((Long)o).longValue();
+        else {
+            StoreUtils.LogError(TAG, "Unexpected type for intent response code.");
+            StoreUtils.LogError(TAG, o.getClass().getName());
+            throw new RuntimeException("Unexpected type for intent response code: " + o.getClass().getName());
+        }
+    }
+
+    /** Private Members **/
+
+    private static String TAG = "SOOMLA GoogleIabHelper";
+
+    // Connection to the service
+    private IInAppBillingService mService;
+    private ServiceConnection mServiceConn;
+
+    // The item type of the current purchase flow
+    private String mPurchasingItemType;
+
+    // The SKU of the item in the current purchase flow
+    private String mPurchasingItemSku;
+
+    private static final int RC_REQUEST = 10001;
 
 }
