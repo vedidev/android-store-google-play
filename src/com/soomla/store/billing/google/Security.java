@@ -59,7 +59,7 @@ public class Security {
 
         if (TextUtils.isEmpty(signedData) || TextUtils.isEmpty(base64PublicKey) || TextUtils.isEmpty(signature)) {
         	Log.e(TAG, "Purchase verification failed: missing data.");
-            if (StoreConfig.AllowAndroidTestPurchases) {
+            if (GooglePlayIabService.AllowAndroidTestPurchases) {
                 Log.e(TAG, "Allowing empty signatures ...");
                 return true;
             }

@@ -86,9 +86,7 @@ public class GoogleIabHelper extends IabHelper {
     // uncomment to verify big chunk google bug (over 20)
 //    public static final int SKU_QUERY_MAX_CHUNK_SIZE = 50;
     public static final int SKU_QUERY_MAX_CHUNK_SIZE = 19;
-    private static String TAG = "SOOMLA IabHelper";
-
-
+    private static String TAG = "SOOMLA GoogleIabHelper";
 
 
 
@@ -113,10 +111,6 @@ public class GoogleIabHelper extends IabHelper {
     public static final String RESPONSE_INAPP_SIGNATURE_LIST = "INAPP_DATA_SIGNATURE_LIST";
     public static final String INAPP_CONTINUATION_TOKEN = "INAPP_CONTINUATION_TOKEN";
 
-    // Item types
-    public static final String ITEM_TYPE_INAPP = "inapp";
-//    public static final String ITEM_TYPE_SUBS = "subs"; // Not supported
-
     // some fields on the getSkuDetails response bundle
     public static final String GET_SKU_DETAILS_ITEM_LIST = "ITEM_ID_LIST";
     public static final String GET_SKU_DETAILS_ITEM_TYPE_LIST = "ITEM_TYPE_LIST";
@@ -127,7 +121,7 @@ public class GoogleIabHelper extends IabHelper {
      * block and is safe to call from a UI thread.
      */
     public GoogleIabHelper() {
-        StoreUtils.LogDebug(TAG, "IAB helper created.");
+        StoreUtils.LogDebug(TAG, "GoogleIabHelper helper created.");
     }
 
 
@@ -306,7 +300,7 @@ public class GoogleIabHelper extends IabHelper {
 
                 SharedPreferences prefs = new ObscuredSharedPreferences(
                         SoomlaApp.getAppContext().getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
-                String publicKey = prefs.getString(StoreConfig.PUBLIC_KEY, "");
+                String publicKey = prefs.getString(GooglePlayIabService.PUBLICKEY_KEY, "");
 
                 // Verify signature
                 if (!Security.verifyPurchase(publicKey, purchaseData, dataSignature)) {
@@ -407,16 +401,17 @@ public class GoogleIabHelper extends IabHelper {
     protected void restorePurchasesAsyncInner() {
         (new Thread(new Runnable() {
             public void run() {
-                IabResult result = new IabResult(IabResult.BILLING_RESPONSE_RESULT_OK, "IabInventory restore successful.");
                 IabInventory inv = null;
                 try {
                     inv = restorePurchases();
                 }
                 catch (IabException ex) {
-                    result = ex.getResult();
+                    IabResult result = ex.getResult();
+                    restorePurchasesFailed(result);
+                    return;
                 }
 
-                restorePurchasesSuccess(result, inv);
+                restorePurchasesSuccess(inv);
             }
         })).start();
     }
@@ -424,16 +419,17 @@ public class GoogleIabHelper extends IabHelper {
     protected void fetchSkusDetailsAsyncInner(final List<String> skus) {
         (new Thread(new Runnable() {
             public void run() {
-                IabResult result = new IabResult(IabResult.BILLING_RESPONSE_RESULT_OK, "IabInventory fetch details successful.");
                 IabInventory inv = null;
                 try {
                     inv = fetchSkusDetails(skus);
                 }
                 catch (IabException ex) {
-                    result = ex.getResult();
+                    IabResult result = ex.getResult();
+                    fetchSkusDetailsFailed(result);
+                    return;
                 }
 
-                fetchSkusDetailsSuccess(result, inv);
+                fetchSkusDetailsSuccess(inv);
             }
         })).start();
     }
@@ -577,7 +573,7 @@ public class GoogleIabHelper extends IabHelper {
 
             SharedPreferences prefs = new ObscuredSharedPreferences(
                     SoomlaApp.getAppContext().getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
-            String publicKey = prefs.getString(StoreConfig.PUBLIC_KEY, "");
+            String publicKey = prefs.getString(GooglePlayIabService.PUBLICKEY_KEY, "");
             for (int i = 0; i < purchaseDataList.size(); ++i) {
                 String purchaseData = purchaseDataList.get(i);
                 String signature = signatureList.get(i);
