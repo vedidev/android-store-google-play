@@ -108,6 +108,7 @@ public class GooglePlayIabService implements IIabService {
             String err = "publicKey is null or empty. Can't initialize store!!";
             StoreUtils.LogError(TAG, err);
         }
+        edit.commit();
     }
 
     private static final String SKU = "ID#sku";
@@ -123,7 +124,7 @@ public class GooglePlayIabService implements IIabService {
                 getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
         String publicKey = prefs.getString(PUBLICKEY_KEY, "");
         if (publicKey.length() == 0 || publicKey.equals("[YOUR PUBLIC KEY FROM THE MARKET]")) {
-            StoreUtils.LogError(TAG, "You didn't provide a public key! You can't make purchases.");
+            StoreUtils.LogError(TAG, "You didn't provide a public key! You can't make purchases. the key: " + publicKey);
             throw new IllegalStateException();
         }
 
