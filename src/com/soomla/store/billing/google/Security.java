@@ -18,9 +18,8 @@ package com.soomla.store.billing.google;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.soomla.store.StoreConfig;
-import com.soomla.store.util.Base64;
-import com.soomla.store.util.Base64DecoderException;
+import com.soomla.util.Base64;
+import com.soomla.util.Base64DecoderException;
 
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;

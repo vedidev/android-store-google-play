@@ -21,10 +21,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 
+import com.soomla.SoomlaConfig;
+import com.soomla.SoomlaUtils;
 import com.soomla.store.SoomlaApp;
-import com.soomla.store.StoreConfig;
 import com.soomla.store.StoreController;
-import com.soomla.store.StoreUtils;
 import com.soomla.store.billing.IIabService;
 import com.soomla.store.billing.IabCallbacks;
 import com.soomla.store.billing.IabException;
@@ -133,14 +133,14 @@ public class GooglePlayIabService implements IIabService {
      */
     public void setPublicKey(String publicKey) {
         SharedPreferences prefs = new ObscuredSharedPreferences(SoomlaApp.getAppContext().
-                getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE));
         SharedPreferences.Editor edit = prefs.edit();
 
         if (publicKey != null && publicKey.length() != 0) {
             edit.putString(PUBLICKEY_KEY, publicKey);
         } else if (prefs.getString(PUBLICKEY_KEY, "").length() == 0) {
             String err = "publicKey is null or empty. Can't initialize store!!";
-            StoreUtils.LogError(TAG, err);
+            SoomlaUtils.LogError(TAG, err);
         }
         edit.commit();
     }
@@ -154,26 +154,31 @@ public class GooglePlayIabService implements IIabService {
                                    String extraData) {
 
         SharedPreferences prefs = new ObscuredSharedPreferences(SoomlaApp.getAppContext().
-                getSharedPreferences(StoreConfig.PREFS_NAME, Context.MODE_PRIVATE));
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE));
         String publicKey = prefs.getString(PUBLICKEY_KEY, "");
         if (publicKey.length() == 0 || publicKey.equals("[YOUR PUBLIC KEY FROM THE MARKET]")) {
-            StoreUtils.LogError(TAG, "You didn't provide a public key! You can't make purchases. the key: " + publicKey);
+            SoomlaUtils.LogError(TAG, "You didn't provide a public key! You can't make purchases. the key: " + publicKey);
             throw new IllegalStateException();
         }
 
 
         try {
             final Intent intent = new Intent(SoomlaApp.getAppContext(), IabActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.putExtra(SKU, sku);
             intent.putExtra(EXTRA_DATA, extraData);
 
             mSavedOnPurchaseListener = purchaseListener;
-            SoomlaApp.getAppContext().startActivity(intent);
+            if (SoomlaApp.getAppContext() instanceof Activity) {
+                Activity activity = (Activity) SoomlaApp.getAppContext();
+                activity.startActivity(intent);
+            } else {
+                SoomlaApp.getAppContext().startActivity(intent);
+            }
 
         } catch(Exception e){
             String msg = "(launchPurchaseFlow) Error purchasing item " + e.getMessage();
-            StoreUtils.LogError(TAG, msg);
+            SoomlaUtils.LogError(TAG, msg);
             purchaseListener.fail(msg);
         }
 
@@ -191,7 +196,7 @@ public class GooglePlayIabService implements IIabService {
     private synchronized void startIabHelper(OnIabSetupFinishedListener onIabSetupFinishedListener) {
         if (isIabServiceInitialized())
         {
-            StoreUtils.LogDebug(TAG, "The helper is started. Just running the post start function.");
+            SoomlaUtils.LogDebug(TAG, "The helper is started. Just running the post start function.");
 
             if (onIabSetupFinishedListener != null && onIabSetupFinishedListener.getIabInitListener() != null) {
                 onIabSetupFinishedListener.getIabInitListener().success(true);
@@ -199,10 +204,10 @@ public class GooglePlayIabService implements IIabService {
             return;
         }
 
-        StoreUtils.LogDebug(TAG, "Creating IAB helper.");
+        SoomlaUtils.LogDebug(TAG, "Creating IAB helper.");
         mHelper = new GoogleIabHelper();
 
-        StoreUtils.LogDebug(TAG, "IAB helper Starting setup.");
+        SoomlaUtils.LogDebug(TAG, "IAB helper Starting setup.");
         mHelper.startSetup(onIabSetupFinishedListener);
     }
 
@@ -215,7 +220,7 @@ public class GooglePlayIabService implements IIabService {
             if (iabInitListener != null) {
                 iabInitListener.fail(msg);
             } else {
-                StoreUtils.LogDebug(TAG, msg);
+                SoomlaUtils.LogDebug(TAG, msg);
             }
             return;
         }
@@ -225,14 +230,14 @@ public class GooglePlayIabService implements IIabService {
             if (iabInitListener != null) {
                 iabInitListener.fail(msg);
             } else {
-                StoreUtils.LogDebug(TAG, msg);
+                SoomlaUtils.LogDebug(TAG, msg);
             }
             return;
         }
 
         if (!mHelper.isAsyncInProgress())
         {
-            StoreUtils.LogDebug(TAG, "Stopping Google Service");
+            SoomlaUtils.LogDebug(TAG, "Stopping Google Service");
             mHelper.dispose();
             mHelper = null;
             if (iabInitListener != null) {
@@ -245,7 +250,7 @@ public class GooglePlayIabService implements IIabService {
             if (iabInitListener != null) {
                 iabInitListener.fail(msg);
             } else {
-                StoreUtils.LogDebug(TAG, msg);
+                SoomlaUtils.LogDebug(TAG, msg);
             }
         }
     }
@@ -265,7 +270,7 @@ public class GooglePlayIabService implements IIabService {
 
         @Override
         public void onRestorePurchasessFinished(IabResult result, IabInventory inventory) {
-            StoreUtils.LogDebug(TAG, "Restore Purchases succeeded");
+            SoomlaUtils.LogDebug(TAG, "Restore Purchases succeeded");
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mRestorePurchasesListener != null) {
                 // fetching owned items
                 List<String> itemSkus = inventory.getAllOwnedSkus(IabHelper.ITEM_TYPE_INAPP);
@@ -277,7 +282,7 @@ public class GooglePlayIabService implements IIabService {
 
                 this.mRestorePurchasesListener.success(purchases);
             } else {
-                StoreUtils.LogError(TAG, "Wither mRestorePurchasesListener==null OR Restore purchases error: " + result.getMessage());
+                SoomlaUtils.LogError(TAG, "Wither mRestorePurchasesListener==null OR Restore purchases error: " + result.getMessage());
                 if (this.mRestorePurchasesListener != null) this.mRestorePurchasesListener.fail(result.getMessage());
             }
 
@@ -299,7 +304,7 @@ public class GooglePlayIabService implements IIabService {
 
         @Override
         public void onFetchSkusDetailsFinished(IabResult result, IabInventory inventory) {
-            StoreUtils.LogDebug(TAG, "Restore Purchases succeeded");
+            SoomlaUtils.LogDebug(TAG, "Restore Purchases succeeded");
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mFetchSkusDetailsListener != null) {
 
                 // @lassic (May 1st): actually, here (query finished) it only makes sense to get the details
@@ -315,7 +320,7 @@ public class GooglePlayIabService implements IIabService {
 
                 this.mFetchSkusDetailsListener.success(skuDetails);
             } else {
-                StoreUtils.LogError(TAG, "Wither mFetchSkusDetailsListener==null OR Fetching details error: " + result.getMessage());
+                SoomlaUtils.LogError(TAG, "Wither mFetchSkusDetailsListener==null OR Fetching details error: " + result.getMessage());
                 if (this.mFetchSkusDetailsListener != null) this.mFetchSkusDetailsListener.fail(result.getMessage());
             }
 
@@ -341,7 +346,7 @@ public class GooglePlayIabService implements IIabService {
         @Override
         public void onIabSetupFinished(IabResult result) {
 
-            StoreUtils.LogDebug(TAG, "IAB helper Setup finished.");
+            SoomlaUtils.LogDebug(TAG, "IAB helper Setup finished.");
             if (result.isFailure()) {
                 if (mIabInitListener != null) mIabInitListener.fail(result.getMessage());
                 return;
@@ -364,7 +369,7 @@ public class GooglePlayIabService implements IIabService {
             /**
              * Wait to see if the purchase succeeded, then start the consumption process.
              */
-            StoreUtils.LogDebug(TAG, "IabPurchase finished: " + result + ", purchase: " + purchase);
+            SoomlaUtils.LogDebug(TAG, "IabPurchase finished: " + result + ", purchase: " + purchase);
 
             GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
 
@@ -411,7 +416,7 @@ public class GooglePlayIabService implements IIabService {
                 finish();
 
                 String msg = "Error purchasing item " + e.getMessage();
-                StoreUtils.LogError(TAG, msg);
+                SoomlaUtils.LogError(TAG, msg);
                 GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
                 if (GooglePlayIabService.getInstance().mSavedOnPurchaseListener != null) {
                     GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(msg);
@@ -430,18 +435,43 @@ public class GooglePlayIabService implements IIabService {
         }
 
         @Override
+        protected void onPause() {
+            super.onPause();
+        }
+
+        boolean firstTime = true;
+        @Override
+        protected void onResume() {
+            super.onResume();
+            firstTime = false;
+        }
+
+        @Override
         protected void onStop() {
             super.onStop();
         }
 
         @Override
-        protected void onDestroy() {
+        protected void onStart() {
+            super.onStart();
 
+            if (!firstTime && SoomlaApp.getAppContext() instanceof Activity) {
+                GooglePlayIabService.getInstance().mHelper.handleActivityResult(10001, Activity.RESULT_CANCELED, null);
+
+                Intent tabIntent = new Intent(this, ((Activity) SoomlaApp.getAppContext()).getClass());
+                tabIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+                startActivity(tabIntent);
+            }
+        }
+
+        @Override
+        protected void onDestroy() {
             if (GooglePlayIabService.getInstance().mWaitingServiceResponse)
             {
                 GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
                 String err = "IabActivity is destroyed during purchase.";
-                StoreUtils.LogError(TAG, err);
+                SoomlaUtils.LogError(TAG, err);
                 if (GooglePlayIabService.getInstance().mSavedOnPurchaseListener != null) {
                     GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(err);
                     GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;

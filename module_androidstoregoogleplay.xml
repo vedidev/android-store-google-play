@@ -8,37 +8,41 @@
   <property name="module.jdk.home.androidstoregoogleplay" value="${jdk.home.android}"/>
   <property name="module.jdk.bin.androidstoregoogleplay" value="${jdk.bin.android}"/>
   <property name="module.jdk.classpath.androidstoregoogleplay" value="jdk.classpath.android"/>
-  
+
   <property name="compiler.args.androidstoregoogleplay" value="-encoding UTF-8 -source 1.6 ${compiler.args}"/>
-  
+
   <property name="androidstoregoogleplay.output.dir" value="${module.androidstoregoogleplay.basedir}/out/production/AndroidStoreGooglePlay"/>
-  
+
   <path id="androidstoregoogleplay.module.bootclasspath">
     <!-- Paths to be included in compilation bootclasspath -->
   </path>
-  
+
   <path id="androidstoregoogleplay.module.production.classpath">
     <path refid="${module.jdk.classpath.androidstoregoogleplay}"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
+    <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
   </path>
-  
+
   <path id="androidstoregoogleplay.runtime.production.module.classpath">
     <pathelement location="${androidstoregoogleplay.output.dir}"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
+    <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
   </path>
-  
+
   <path id="androidstoregoogleplay.module.classpath">
     <path refid="${module.jdk.classpath.androidstoregoogleplay}"/>
     <pathelement location="${androidstoregoogleplay.output.dir}"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
+    <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
   </path>
-  
+
   <path id="androidstoregoogleplay.runtime.module.classpath">
     <pathelement location="${androidstoregoogleplay.output.dir}"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
+    <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
   </path>
-  
-  
+
+
   <patternset id="excluded.from.module.androidstoregoogleplay">
     <patternset refid="ignored.files"/>
   </patternset>
@@ -47,14 +51,14 @@
     <patternset refid="compiler.excluded"/>
     <patternset refid="excluded.from.module.androidstoregoogleplay"/>
   </patternset>
-  
+
   <path id="androidstoregoogleplay.module.sourcepath">
     <dirset dir="${module.androidstoregoogleplay.basedir}">
       <include name="src"/>
         <include name=".idea/gen/com/android"/>
     </dirset>
   </path>
-  
+
   <target name="config">
 
     <property name="config-target-path" value="${basedir}/src/com/soomla/store/"/>
@@ -66,7 +70,7 @@
       <filter token="CONFIG.LOGGING" value="${logging}"/>
      </filterset>
     </copy>
-  
+
     <!-- Now set it to read-only, as we don't want people accidentally
          editing the wrong one. NOTE: This step is unnecessary, but I do
          it so the developers remember that this is not the original file. -->
@@ -92,7 +96,7 @@
     </target>
 
     <target name="compile.module.androidstoregoogleplay" depends="compile.module.androidstoregoogleplay.production" description="Compile module AndroidStoreGooglePlay"/>
-  
+
   <target name="compile.module.androidstoregoogleplay.production" description="Compile module AndroidStoreGooglePlay; production classes" depends="aidl">
     <mkdir dir="${androidstoregoogleplay.output.dir}"/>
     <javac destdir="${androidstoregoogleplay.output.dir}" debug="${compiler.debug}" nowarn="${compiler.generate.no.warnings}" memorymaximumsize="${compiler.max.memory}" fork="true" executable="${module.jdk.bin.androidstoregoogleplay}/javac">
@@ -102,7 +106,7 @@
       <src refid="androidstoregoogleplay.module.sourcepath"/>
       <patternset refid="excluded.from.compilation.androidstoregoogleplay"/>
     </javac>
-    
+
     <copy todir="${androidstoregoogleplay.output.dir}">
       <fileset dir="${module.androidstoregoogleplay.basedir}/src">
         <patternset refid="compiler.resources"/>
@@ -111,7 +115,7 @@
       </fileset>
     </copy>
   </target>
-  
+
   <target name="clean.module.androidstoregoogleplay" description="cleanup module">
     <delete dir="${androidstoregoogleplay.output.dir}"/>
   </target>
