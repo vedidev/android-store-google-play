@@ -24,7 +24,7 @@ import android.os.Bundle;
 import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
 import com.soomla.SoomlaApp;
-import com.soomla.store.StoreController;
+import com.soomla.store.SoomlaStore;
 import com.soomla.store.billing.IIabService;
 import com.soomla.store.billing.IabCallbacks;
 import com.soomla.store.billing.IabException;
@@ -125,7 +125,7 @@ public class GooglePlayIabService implements IIabService {
 
     /**
      * Sets the public key for Google Play IAB Service.
-     * This function MUST be called once when the application loads and after StoreController
+     * This function MUST be called once when the application loads and after SoomlaStore
      * initializes.
      *
      * @param publicKey the public key from the developer console.
@@ -483,7 +483,7 @@ public class GooglePlayIabService implements IIabService {
 
 
     public static GooglePlayIabService getInstance() {
-        return (GooglePlayIabService) StoreController.getInstance().getInAppBillingService();
+        return (GooglePlayIabService) SoomlaStore.getInstance().getInAppBillingService();
     }
 
 
