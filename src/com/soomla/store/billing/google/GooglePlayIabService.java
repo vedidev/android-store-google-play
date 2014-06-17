@@ -23,7 +23,7 @@ import android.os.Bundle;
 
 import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
-import com.soomla.store.SoomlaApp;
+import com.soomla.SoomlaApp;
 import com.soomla.store.StoreController;
 import com.soomla.store.billing.IIabService;
 import com.soomla.store.billing.IabCallbacks;
@@ -33,7 +33,6 @@ import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.billing.IabSkuDetails;
-import com.soomla.store.data.ObscuredSharedPreferences;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -132,8 +131,8 @@ public class GooglePlayIabService implements IIabService {
      * @param publicKey the public key from the developer console.
      */
     public void setPublicKey(String publicKey) {
-        SharedPreferences prefs = new ObscuredSharedPreferences(SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE));
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor edit = prefs.edit();
 
         if (publicKey != null && publicKey.length() != 0) {
@@ -153,8 +152,8 @@ public class GooglePlayIabService implements IIabService {
                                    final IabCallbacks.OnPurchaseListener purchaseListener,
                                    String extraData) {
 
-        SharedPreferences prefs = new ObscuredSharedPreferences(SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE));
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
         String publicKey = prefs.getString(PUBLICKEY_KEY, "");
         if (publicKey.length() == 0 || publicKey.equals("[YOUR PUBLIC KEY FROM THE MARKET]")) {
             SoomlaUtils.LogError(TAG, "You didn't provide a public key! You can't make purchases. the key: " + publicKey);

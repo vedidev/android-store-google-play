@@ -31,7 +31,7 @@ import android.os.RemoteException;
 import android.text.TextUtils;
 
 import com.soomla.SoomlaConfig;
-import com.soomla.store.SoomlaApp;
+import com.soomla.SoomlaApp;
 import com.android.vending.billing.IInAppBillingService;
 import com.soomla.SoomlaUtils;
 import com.soomla.store.billing.IabException;
@@ -40,7 +40,6 @@ import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabSkuDetails;
-import com.soomla.store.data.ObscuredSharedPreferences;
 
 import org.json.JSONException;
 
@@ -219,8 +218,8 @@ public class GoogleIabHelper extends IabHelper {
                 purchase = new IabPurchase(mPurchasingItemType, purchaseData, dataSignature);
                 String sku = purchase.getSku();
 
-                SharedPreferences prefs = new ObscuredSharedPreferences(
-                        SoomlaApp.getAppContext().getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE));
+                SharedPreferences prefs =
+                        SoomlaApp.getAppContext().getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
                 String publicKey = prefs.getString(GooglePlayIabService.PUBLICKEY_KEY, "");
 
                 // Verify signature
@@ -564,8 +563,8 @@ public class GoogleIabHelper extends IabHelper {
             ArrayList<String> signatureList = ownedItems.getStringArrayList(
                     RESPONSE_INAPP_SIGNATURE_LIST);
 
-            SharedPreferences prefs = new ObscuredSharedPreferences(
-                    SoomlaApp.getAppContext().getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE));
+            SharedPreferences prefs =
+                    SoomlaApp.getAppContext().getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
             String publicKey = prefs.getString(GooglePlayIabService.PUBLICKEY_KEY, "");
             for (int i = 0; i < purchaseDataList.size(); ++i) {
                 String purchaseData = purchaseDataList.get(i);
