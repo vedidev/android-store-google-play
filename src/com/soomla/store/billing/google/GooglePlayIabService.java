@@ -163,7 +163,6 @@ public class GooglePlayIabService implements IIabService {
 
         try {
             final Intent intent = new Intent(SoomlaApp.getAppContext(), IabActivity.class);
-//            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.putExtra(SKU, sku);
             intent.putExtra(EXTRA_DATA, extraData);
 
@@ -172,6 +171,7 @@ public class GooglePlayIabService implements IIabService {
                 Activity activity = (Activity) SoomlaApp.getAppContext();
                 activity.startActivity(intent);
             } else {
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 SoomlaApp.getAppContext().startActivity(intent);
             }
 
