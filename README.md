@@ -30,7 +30,7 @@ The steps to integrate this billing service are also in android-store's [Selecti
     <meta-data android:name="billing.service" android:value="google.GooglePlayIabService" />
   ```
 
-3. After you initialize StoreController, let the plugin know your public key from the dev console:
+3. After you initialize `SoomlaStore`, let the plugin know your public key from the dev console:
 
   ```Java
     GooglePlayIabService.getInstance().setPublicKey("[YOUR PUBLIC KEY FROM THE MARKET]");
@@ -48,13 +48,13 @@ For Google Play, We recommend that you open the IAB Service and keep it open in 
   When you open the store, call:  
 
   ```Java
-    StoreController.getInstance().startIabServiceInBg();
+    SoomlaStore.getInstance().startIabServiceInBg();
   ```
 
   When the store is closed, call:  
 
   ```Java
-    StoreController.getInstance().stopIabServiceInBg();
+    SoomlaStore.getInstance().stopIabServiceInBg();
   ```
 
 
