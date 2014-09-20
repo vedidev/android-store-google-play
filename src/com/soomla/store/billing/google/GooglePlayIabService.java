@@ -455,7 +455,7 @@ public class GooglePlayIabService implements IIabService {
             super.onStart();
 
             if (!firstTime && SoomlaApp.getAppContext() instanceof Activity) {
-                GooglePlayIabService.getInstance().mHelper.handleActivityResult(10001, Activity.RESULT_CANCELED, null);
+                onActivityResult(10001, Activity.RESULT_CANCELED, null);
 
                 Intent tabIntent = new Intent(this, ((Activity) SoomlaApp.getAppContext()).getClass());
                 tabIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
