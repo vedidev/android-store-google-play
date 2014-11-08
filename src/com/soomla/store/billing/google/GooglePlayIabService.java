@@ -398,6 +398,7 @@ public class GooglePlayIabService implements IIabService {
      * Please do NOT start it on your own.
      */
     public static class IabActivity extends Activity {
+        private boolean mInProgressDestroy = false;
 
         @Override
         protected void onCreate(Bundle savedInstanceState) {
@@ -409,8 +410,11 @@ public class GooglePlayIabService implements IIabService {
 
             try {
                 OnIabPurchaseFinishedListener onIabPurchaseFinishedListener = new OnIabPurchaseFinishedListener();
-                GooglePlayIabService.getInstance().mWaitingServiceResponse = true;
                 GooglePlayIabService.getInstance().mHelper.launchPurchaseFlow(this, productId, onIabPurchaseFinishedListener, payload);
+                GooglePlayIabService.getInstance().mWaitingServiceResponse = true;
+            } catch (IllegalStateException e) {
+                mInProgressDestroy = true;
+                finish();
             } catch (Exception e) {
                 finish();
 
@@ -466,7 +470,7 @@ public class GooglePlayIabService implements IIabService {
 
         @Override
         protected void onDestroy() {
-            if (GooglePlayIabService.getInstance().mWaitingServiceResponse)
+            if (!mInProgressDestroy && GooglePlayIabService.getInstance().mWaitingServiceResponse)
             {
                 GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
                 String err = "IabActivity is destroyed during purchase.";
