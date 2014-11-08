@@ -58,21 +58,23 @@ For Google Play, We recommend that you open the IAB Service and keep it open in 
   ```
 
 
-## Contribution
+Contribution
+---
+SOOMLA appreciates code contributions! You are more than welcome to extend the capabilities of SOOMLA.
 
+Fork -> Clone -> Implement -> Add documentation -> Test -> Pull-Request.
 
-We want you!
-
-Fork -> Clone -> Implement -> Test -> Pull-Request. We have great RESPECT for contributors.
+IMPORTANT: If you would like to contribute, please follow our [Documentation Guidelines](https://github.com/soomla/android-store/blob/master/documentation.md). Clear, consistent comments will make our code easy to understand.
 
 ## SOOMLA, Elsewhere ...
 
++ [Framework Website](http://www.soom.la/)
++ [Knowledge Base](http://know.soom.la/)
 
-+ [Framework Page](http://project.soom.la/)
-+ [On Facebook](https://www.facebook.com/pages/The-SOOMLA-Project/389643294427376)
-+ [On AngelList](https://angel.co/the-soomla-project)
+
+<a href="https://www.facebook.com/pages/The-SOOMLA-Project/389643294427376"><img src="http://know.soom.la/img/tutorial_img/social/Facebook.png"></a><a href="https://twitter.com/Soomla"><img src="http://know.soom.la/img/tutorial_img/social/Twitter.png"></a><a href="https://plus.google.com/+SoomLa/posts"><img src="http://know.soom.la/img/tutorial_img/social/GoogleP.png"></a><a href ="https://www.youtube.com/channel/UCR1-D9GdSRRLD0fiEDkpeyg"><img src="http://know.soom.la/img/tutorial_img/social/Youtube.png"></a>
 
 ## License
 
-MIT License. Copyright (c) 2014 SOOMLA. http://soom.la
-+ http://www.opensource.org/licenses/MIT
+Apache License. Copyright (c) 2012-2014 SOOMLA. http://soom.la
++ http://opensource.org/licenses/Apache-2.0
