@@ -416,6 +416,7 @@ public class GooglePlayIabService implements IIabService {
                 mInProgressDestroy = true;
                 finish();
             } catch (Exception e) {
+                SoomlaUtils.LogDebug(TAG, "MSG: " + e.getMessage());
                 finish();
 
                 String msg = "Error purchasing item " + e.getMessage();
@@ -430,10 +431,12 @@ public class GooglePlayIabService implements IIabService {
 
         @Override
         protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+            SoomlaUtils.LogDebug(TAG, "onActivityResult 1");
             if (!GooglePlayIabService.getInstance().mHelper.handleActivityResult(requestCode, resultCode, data)) {
+                SoomlaUtils.LogDebug(TAG, "onActivityResult 2");
                 super.onActivityResult(requestCode, resultCode, data);
             }
-
+            SoomlaUtils.LogDebug(TAG, "onActivityResult 3");
             finish();
         }
 
@@ -445,6 +448,7 @@ public class GooglePlayIabService implements IIabService {
         boolean firstTime = true;
         @Override
         protected void onResume() {
+            SoomlaUtils.LogDebug(TAG, "onResume 1");
             super.onResume();
             firstTime = false;
         }
@@ -456,31 +460,41 @@ public class GooglePlayIabService implements IIabService {
 
         @Override
         protected void onStart() {
+            SoomlaUtils.LogDebug(TAG, "onStart 1");
             super.onStart();
 
             if (!firstTime && SoomlaApp.getAppContext() instanceof Activity) {
+                SoomlaUtils.LogDebug(TAG, "onStart 2");
                 onActivityResult(10001, Activity.RESULT_CANCELED, null);
 
                 Intent tabIntent = new Intent(this, ((Activity) SoomlaApp.getAppContext()).getClass());
                 tabIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
+                SoomlaUtils.LogDebug(TAG, "onStart 3");
                 startActivity(tabIntent);
             }
+            SoomlaUtils.LogDebug(TAG, "onStart 4");
         }
 
         @Override
         protected void onDestroy() {
+            SoomlaUtils.LogDebug(TAG, "onDestroy 1");
             if (!mInProgressDestroy && GooglePlayIabService.getInstance().mWaitingServiceResponse)
             {
+                SoomlaUtils.LogDebug(TAG, "onDestroy 2");
                 GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
                 String err = "IabActivity is destroyed during purchase.";
                 SoomlaUtils.LogError(TAG, err);
-                if (GooglePlayIabService.getInstance().mSavedOnPurchaseListener != null) {
-                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(err);
-                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
-                }
-            }
 
+                // we're letting the helper take care of closing so there won't be any async process stuck in it.
+                onActivityResult(10001, Activity.RESULT_CANCELED, null);
+
+//                if (GooglePlayIabService.getInstance().mSavedOnPurchaseListener != null) {
+//                    SoomlaUtils.LogDebug(TAG, "onDestroy 3");
+//                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(err);
+//                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
+//                }
+            }
+            SoomlaUtils.LogDebug(TAG, "onDestroy 4");
             super.onDestroy();
         }
     }
