@@ -20,19 +20,20 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-
+import com.soomla.SoomlaApp;
 import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
-import com.soomla.SoomlaApp;
 import com.soomla.store.SoomlaStore;
 import com.soomla.store.billing.IIabService;
+import com.soomla.store.billing.IIabVerifiable;
 import com.soomla.store.billing.IabCallbacks;
 import com.soomla.store.billing.IabException;
 import com.soomla.store.billing.IabHelper;
-import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
+import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabSkuDetails;
+import com.soomla.store.domain.PurchasableVirtualItem;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +43,7 @@ import java.util.List;
  *
  * see parent for more docs.
  */
-public class GooglePlayIabService implements IIabService {
+public class GooglePlayIabService implements IIabService, IIabVerifiable {
 
     /**
      * see parent
@@ -142,6 +143,67 @@ public class GooglePlayIabService implements IIabService {
             SoomlaUtils.LogError(TAG, err);
         }
         edit.commit();
+    }
+
+    public boolean getVerifyPurchases() {
+        return getBooleanPref(VERIFY_PURCHASES, false);
+    }
+
+    @Override
+    public void setVerifyPurchases(boolean verifyPurchases) {
+        setBooleanPref(VERIFY_PURCHASES, verifyPurchases);
+    }
+
+    @Override
+    public void verifyPurchase(IabPurchase purchase, PurchasableVirtualItem pvi) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+
+        SoomlaGpVerification sv = new SoomlaGpVerification(purchase, pvi,
+                prefs.getString(VERIFY_CLIENT_ID, ""),
+                prefs.getString(VERIFY_CLIENT_SECRET, ""),
+                prefs.getString(VERIFY_REFRESH_TOKEN, ""));
+        sv.verifyDataAsync();
+    }
+
+    public void setAccessToken(String token) {
+        setStringPref(VERIFY_ACCESS_TOKEN, token);
+    }
+
+    public String getAccessToken() {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(VERIFY_ACCESS_TOKEN, "");
+    }
+
+    private String getStringPref(String key, String defaultValue) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(key, defaultValue);
+    }
+
+    private void setStringPref(String key, String value) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        edit.putString(key, value);
+        edit.apply();
+    }
+
+    private boolean getBooleanPref(String key, boolean defaultValue) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getBoolean(key, defaultValue);
+    }
+
+    private void setBooleanPref(String key, boolean value) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        edit.putBoolean(key, value);
+        edit.apply();
     }
 
     /**
@@ -254,6 +316,17 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
+    public void setClientId(String clientId) {
+        setStringPref(VERIFY_CLIENT_ID, clientId);
+    }
+
+    public void setClientSecret(String clientSecret) {
+        setStringPref(VERIFY_CLIENT_SECRET, clientSecret);
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        setStringPref(VERIFY_REFRESH_TOKEN, refreshToken);
+    }
 
     /**
      * Handle Restore Purchases processes
@@ -512,6 +585,11 @@ public class GooglePlayIabService implements IIabService {
     private boolean mWaitingServiceResponse = false;
 
     public static final String PUBLICKEY_KEY = "PO#SU#SO#GU";
+    public static final String VERIFY_PURCHASES = "VE#RI#FY#_P#UR#CH#AS#ES";
+    public static final String VERIFY_REFRESH_TOKEN = "V#ER#IF#Y_#R#E#FRE#SH#_T#OK#EN";
+    public static final String VERIFY_CLIENT_ID = "VE#RI#FY#_C#LI#EN#T_#ID";
+    public static final String VERIFY_CLIENT_SECRET = "VE#RI#FY#_C#LI#E#NT#_#SE#CR#ET";
+    public static final String VERIFY_ACCESS_TOKEN = "SU#PO#GU#SO";
 
     private static final String SKU = "ID#sku";
     private static final String EXTRA_DATA = "ID#extraData";
