@@ -1,6 +1,8 @@
 package com.soomla.store.billing.google;
 
 import android.os.AsyncTask;
+import android.text.TextUtils;
+
 import com.soomla.BusProvider;
 import com.soomla.SoomlaUtils;
 import com.soomla.store.billing.IabPurchase;
@@ -17,6 +19,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -46,13 +49,15 @@ public class SoomlaGpVerification {
 
     public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken) {
 
+        if (purchase == null || pvi == null || TextUtils.isEmpty(clientId) || TextUtils.isEmpty(clientSecret) || TextUtils.isEmpty(refreshToken)) {
+            SoomlaUtils.LogError(TAG, "Can't initialize SoomlaGpVerification. Missing params.");
+            throw new IllegalArgumentException();
+        }
+
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.refreshToken = refreshToken;
 
-        if (purchase == null || pvi == null) {
-            throw new IllegalArgumentException();
-        }
 
         this.purchase = purchase;
         this.pvi = pvi;
@@ -61,7 +66,7 @@ public class SoomlaGpVerification {
     private boolean verifyPurchase() {
         String accessToken = GooglePlayIabService.getInstance().getAccessToken();
         // access token has not been defined yet, force to get it
-        if (accessToken == null || accessToken.length() == 0) {
+        if (TextUtils.isEmpty(accessToken)) {
             repeat = true;
             return false;
         }

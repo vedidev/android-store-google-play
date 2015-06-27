@@ -20,9 +20,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.TextUtils;
+
 import com.soomla.SoomlaApp;
 import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
+import com.soomla.data.KeyValueStorage;
 import com.soomla.store.SoomlaStore;
 import com.soomla.store.billing.IIabService;
 import com.soomla.store.billing.IabCallbacks;
@@ -150,15 +153,16 @@ public class GooglePlayIabService implements IIabService {
     }
 
     public boolean getVerifyPurchases() {
-        return getBooleanPref(VERIFY_PURCHASES, false);
+        return !TextUtils.isEmpty(KeyValueStorage.getValue(VERIFY_PURCHASES_KEY));
     }
 
     @Override
-    public void configVerifyPurchases(Map<String, Object> config) {
-        SharedPreferences prefs = SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor edit = prefs.edit();
+    public void configVerifyPurchases(Map<String, String> config) {
 
+        KeyValueStorage.deleteKeyValue(VERIFY_PURCHASES_KEY);
+        KeyValueStorage.deleteKeyValue(VERIFY_CLIENT_ID_KEY);
+        KeyValueStorage.deleteKeyValue(VERIFY_CLIENT_SECRET_KEY);
+        KeyValueStorage.deleteKeyValue(VERIFY_REFRESH_TOKEN_KEY);
         if (config != null) {
             try {
                 checkConfigItem(config, "clientId");
@@ -169,42 +173,30 @@ public class GooglePlayIabService implements IIabService {
                 return;
             }
 
-            edit.putString(VERIFY_CLIENT_ID, (String) config.get("clientId"));
-            edit.putString(VERIFY_CLIENT_SECRET, (String) config.get("clientSecret"));
-            edit.putString(VERIFY_REFRESH_TOKEN, (String) config.get("refreshToken"));
+            KeyValueStorage.setValue(VERIFY_CLIENT_ID_KEY, config.get("clientId"));
+            KeyValueStorage.setValue(VERIFY_CLIENT_SECRET_KEY, config.get("clientSecret"));
+            KeyValueStorage.setValue(VERIFY_REFRESH_TOKEN_KEY, config.get("refreshToken"));
 
-            edit.putBoolean(VERIFY_PURCHASES, true);
-        } else {
-            edit.remove(VERIFY_CLIENT_ID);
-            edit.remove(VERIFY_CLIENT_SECRET);
-            edit.remove(VERIFY_REFRESH_TOKEN);
-
-            edit.remove(VERIFY_PURCHASES);
+            KeyValueStorage.setValue(VERIFY_PURCHASES_KEY, "yes");
         }
-
-        edit.apply();
     }
 
     @Override
     public void verifyPurchase(IabPurchase purchase, PurchasableVirtualItem pvi) {
-        SharedPreferences prefs = SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
 
         SoomlaGpVerification sv = new SoomlaGpVerification(purchase, pvi,
-                prefs.getString(VERIFY_CLIENT_ID, ""),
-                prefs.getString(VERIFY_CLIENT_SECRET, ""),
-                prefs.getString(VERIFY_REFRESH_TOKEN, ""));
+                KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
+                KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
+                KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY));
         sv.verifyPurchaseAsync();
     }
 
     public void setAccessToken(String token) {
-        setStringPref(VERIFY_ACCESS_TOKEN, token);
+        KeyValueStorage.setValue(VERIFY_ACCESS_TOKEN_KEY, token);
     }
 
     public String getAccessToken() {
-        SharedPreferences prefs = SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString(VERIFY_ACCESS_TOKEN, "");
+        return KeyValueStorage.getValue(VERIFY_ACCESS_TOKEN_KEY);
     }
 
     private String getStringPref(String key, String defaultValue) {
@@ -591,9 +583,9 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
-    private void checkConfigItem(Map<String, Object> config, String key) {
-        Object objToCheck = config.get(key);
-        if (objToCheck == null || !(objToCheck instanceof String)) {
+    private void checkConfigItem(Map<String, String> config, String key) {
+        String strToCheck = config.get(key);
+        if (TextUtils.isEmpty(strToCheck)) {
             throw new IllegalArgumentException("Please, provide value for " + key);
         }
     }
@@ -610,11 +602,12 @@ public class GooglePlayIabService implements IIabService {
     private boolean mWaitingServiceResponse = false;
 
     public static final String PUBLICKEY_KEY = "PO#SU#SO#GU";
-    public static final String VERIFY_PURCHASES = "VE#RI#FY#_P#UR#CH#AS#ES";
-    public static final String VERIFY_REFRESH_TOKEN = "V#ER#IF#Y_#R#E#FRE#SH#_T#OK#EN";
-    public static final String VERIFY_CLIENT_ID = "VE#RI#FY#_C#LI#EN#T_#ID";
-    public static final String VERIFY_CLIENT_SECRET = "VE#RI#FY#_C#LI#E#NT#_#SE#CR#ET";
-    public static final String VERIFY_ACCESS_TOKEN = "SU#PO#GU#SO";
+
+    public static final String VERIFY_PURCHASES_KEY = "soomla.verification.verifyPurchases";
+    public static final String VERIFY_REFRESH_TOKEN_KEY = "soomla.verification.refreshToken";
+    public static final String VERIFY_CLIENT_ID_KEY = "soomla.verification.clientId";
+    public static final String VERIFY_CLIENT_SECRET_KEY = "soomla.verification.clientSecret";
+    public static final String VERIFY_ACCESS_TOKEN_KEY = "soomla.verification.accessToken";
 
     private static final String SKU = "ID#sku";
     private static final String EXTRA_DATA = "ID#extraData";
