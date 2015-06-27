@@ -25,7 +25,6 @@ import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
 import com.soomla.store.SoomlaStore;
 import com.soomla.store.billing.IIabService;
-import com.soomla.store.billing.IIabVerifiable;
 import com.soomla.store.billing.IabCallbacks;
 import com.soomla.store.billing.IabException;
 import com.soomla.store.billing.IabHelper;
@@ -37,13 +36,18 @@ import com.soomla.store.domain.PurchasableVirtualItem;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This is the Google Play plugin implementation of IIabService.
  *
  * see parent for more docs.
  */
-public class GooglePlayIabService implements IIabService, IIabVerifiable {
+public class GooglePlayIabService implements IIabService {
+
+    public GooglePlayIabService() {
+        configVerifyPurchases(null);    // we reset it every run
+    }
 
     /**
      * see parent
@@ -150,8 +154,35 @@ public class GooglePlayIabService implements IIabService, IIabVerifiable {
     }
 
     @Override
-    public void setVerifyPurchases(boolean verifyPurchases) {
-        setBooleanPref(VERIFY_PURCHASES, verifyPurchases);
+    public void configVerifyPurchases(Map<String, Object> config) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        if (config != null) {
+            try {
+                checkConfigItem(config, "clientId");
+                checkConfigItem(config, "clientSecret");
+                checkConfigItem(config, "refreshToken");
+            } catch (IllegalArgumentException e) {
+                SoomlaUtils.LogError(TAG, e.getMessage());
+                return;
+            }
+
+            edit.putString(VERIFY_CLIENT_ID, (String) config.get("clientId"));
+            edit.putString(VERIFY_CLIENT_SECRET, (String) config.get("clientSecret"));
+            edit.putString(VERIFY_REFRESH_TOKEN, (String) config.get("refreshToken"));
+
+            edit.putBoolean(VERIFY_PURCHASES, true);
+        } else {
+            edit.remove(VERIFY_CLIENT_ID);
+            edit.remove(VERIFY_CLIENT_SECRET);
+            edit.remove(VERIFY_REFRESH_TOKEN);
+
+            edit.remove(VERIFY_PURCHASES);
+        }
+
+        edit.apply();
     }
 
     @Override
@@ -163,7 +194,7 @@ public class GooglePlayIabService implements IIabService, IIabVerifiable {
                 prefs.getString(VERIFY_CLIENT_ID, ""),
                 prefs.getString(VERIFY_CLIENT_SECRET, ""),
                 prefs.getString(VERIFY_REFRESH_TOKEN, ""));
-        sv.verifyDataAsync();
+        sv.verifyPurchaseAsync();
     }
 
     public void setAccessToken(String token) {
@@ -314,18 +345,6 @@ public class GooglePlayIabService implements IIabService, IIabVerifiable {
                 SoomlaUtils.LogDebug(TAG, msg);
             }
         }
-    }
-
-    public void setClientId(String clientId) {
-        setStringPref(VERIFY_CLIENT_ID, clientId);
-    }
-
-    public void setClientSecret(String clientSecret) {
-        setStringPref(VERIFY_CLIENT_SECRET, clientSecret);
-    }
-
-    public void setRefreshToken(String refreshToken) {
-        setStringPref(VERIFY_REFRESH_TOKEN, refreshToken);
     }
 
     /**
@@ -572,6 +591,12 @@ public class GooglePlayIabService implements IIabService, IIabVerifiable {
         }
     }
 
+    private void checkConfigItem(Map<String, Object> config, String key) {
+        Object objToCheck = config.get(key);
+        if (objToCheck == null || !(objToCheck instanceof String)) {
+            throw new IllegalArgumentException("Please, provide value for " + key);
+        }
+    }
 
     public static GooglePlayIabService getInstance() {
         return (GooglePlayIabService) SoomlaStore.getInstance().getInAppBillingService();

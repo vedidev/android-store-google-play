@@ -58,7 +58,7 @@ public class SoomlaGpVerification {
         this.pvi = pvi;
     }
 
-    public boolean verifyData() {
+    private boolean verifyPurchase() {
         String accessToken = GooglePlayIabService.getInstance().getAccessToken();
         // access token has not been defined yet, force to get it
         if (accessToken == null || accessToken.length() == 0) {
@@ -134,15 +134,15 @@ public class SoomlaGpVerification {
         errorMessage = message;
     }
 
-    public void verifyDataAsync() {
+    public void verifyPurchaseAsync() {
         runAsync(new Runnable() {
             @Override
             public void run() {
-                boolean result = verifyData();
+                boolean result = verifyPurchase();
                 if (repeat && !repeated) {   // we repeat just once
                     if (refreshToken()) {
                         repeated = true;
-                        verifyDataAsync();
+                        verifyPurchaseAsync();
                         return;
                     }
                 }
