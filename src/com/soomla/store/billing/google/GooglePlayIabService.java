@@ -199,36 +199,6 @@ public class GooglePlayIabService implements IIabService {
         return KeyValueStorage.getValue(VERIFY_ACCESS_TOKEN_KEY);
     }
 
-    private String getStringPref(String key, String defaultValue) {
-        SharedPreferences prefs = SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString(key, defaultValue);
-    }
-
-    private void setStringPref(String key, String value) {
-        SharedPreferences prefs = SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor edit = prefs.edit();
-
-        edit.putString(key, value);
-        edit.apply();
-    }
-
-    private boolean getBooleanPref(String key, boolean defaultValue) {
-        SharedPreferences prefs = SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getBoolean(key, defaultValue);
-    }
-
-    private void setBooleanPref(String key, boolean value) {
-        SharedPreferences prefs = SoomlaApp.getAppContext().
-                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor edit = prefs.edit();
-
-        edit.putBoolean(key, value);
-        edit.apply();
-    }
-
     /**
      * see parent
      */
