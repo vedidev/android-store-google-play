@@ -20,22 +20,23 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-
+import com.soomla.SoomlaApp;
 import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
-import com.soomla.SoomlaApp;
 import com.soomla.store.SoomlaStore;
 import com.soomla.store.billing.IIabService;
 import com.soomla.store.billing.IabCallbacks;
 import com.soomla.store.billing.IabException;
 import com.soomla.store.billing.IabHelper;
-import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
+import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabSkuDetails;
+import com.soomla.store.domain.PurchasableVirtualItem;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This is the Google Play plugin implementation of IIabService.
@@ -43,6 +44,10 @@ import java.util.List;
  * see parent for more docs.
  */
 public class GooglePlayIabService implements IIabService {
+
+    public GooglePlayIabService() {
+        configVerifyPurchases(null);    // we reset it every run
+    }
 
     /**
      * see parent
@@ -142,6 +147,94 @@ public class GooglePlayIabService implements IIabService {
             SoomlaUtils.LogError(TAG, err);
         }
         edit.commit();
+    }
+
+    public boolean getVerifyPurchases() {
+        return getBooleanPref(VERIFY_PURCHASES, false);
+    }
+
+    @Override
+    public void configVerifyPurchases(Map<String, Object> config) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        if (config != null) {
+            try {
+                checkConfigItem(config, "clientId");
+                checkConfigItem(config, "clientSecret");
+                checkConfigItem(config, "refreshToken");
+            } catch (IllegalArgumentException e) {
+                SoomlaUtils.LogError(TAG, e.getMessage());
+                return;
+            }
+
+            edit.putString(VERIFY_CLIENT_ID, (String) config.get("clientId"));
+            edit.putString(VERIFY_CLIENT_SECRET, (String) config.get("clientSecret"));
+            edit.putString(VERIFY_REFRESH_TOKEN, (String) config.get("refreshToken"));
+
+            edit.putBoolean(VERIFY_PURCHASES, true);
+        } else {
+            edit.remove(VERIFY_CLIENT_ID);
+            edit.remove(VERIFY_CLIENT_SECRET);
+            edit.remove(VERIFY_REFRESH_TOKEN);
+
+            edit.remove(VERIFY_PURCHASES);
+        }
+
+        edit.apply();
+    }
+
+    @Override
+    public void verifyPurchase(IabPurchase purchase, PurchasableVirtualItem pvi) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+
+        SoomlaGpVerification sv = new SoomlaGpVerification(purchase, pvi,
+                prefs.getString(VERIFY_CLIENT_ID, ""),
+                prefs.getString(VERIFY_CLIENT_SECRET, ""),
+                prefs.getString(VERIFY_REFRESH_TOKEN, ""));
+        sv.verifyPurchaseAsync();
+    }
+
+    public void setAccessToken(String token) {
+        setStringPref(VERIFY_ACCESS_TOKEN, token);
+    }
+
+    public String getAccessToken() {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(VERIFY_ACCESS_TOKEN, "");
+    }
+
+    private String getStringPref(String key, String defaultValue) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(key, defaultValue);
+    }
+
+    private void setStringPref(String key, String value) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        edit.putString(key, value);
+        edit.apply();
+    }
+
+    private boolean getBooleanPref(String key, boolean defaultValue) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getBoolean(key, defaultValue);
+    }
+
+    private void setBooleanPref(String key, boolean value) {
+        SharedPreferences prefs = SoomlaApp.getAppContext().
+                getSharedPreferences(SoomlaConfig.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        edit.putBoolean(key, value);
+        edit.apply();
     }
 
     /**
@@ -253,7 +346,6 @@ public class GooglePlayIabService implements IIabService {
             }
         }
     }
-
 
     /**
      * Handle Restore Purchases processes
@@ -499,6 +591,12 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
+    private void checkConfigItem(Map<String, Object> config, String key) {
+        Object objToCheck = config.get(key);
+        if (objToCheck == null || !(objToCheck instanceof String)) {
+            throw new IllegalArgumentException("Please, provide value for " + key);
+        }
+    }
 
     public static GooglePlayIabService getInstance() {
         return (GooglePlayIabService) SoomlaStore.getInstance().getInAppBillingService();
@@ -512,6 +610,11 @@ public class GooglePlayIabService implements IIabService {
     private boolean mWaitingServiceResponse = false;
 
     public static final String PUBLICKEY_KEY = "PO#SU#SO#GU";
+    public static final String VERIFY_PURCHASES = "VE#RI#FY#_P#UR#CH#AS#ES";
+    public static final String VERIFY_REFRESH_TOKEN = "V#ER#IF#Y_#R#E#FRE#SH#_T#OK#EN";
+    public static final String VERIFY_CLIENT_ID = "VE#RI#FY#_C#LI#EN#T_#ID";
+    public static final String VERIFY_CLIENT_SECRET = "VE#RI#FY#_C#LI#E#NT#_#SE#CR#ET";
+    public static final String VERIFY_ACCESS_TOKEN = "SU#PO#GU#SO";
 
     private static final String SKU = "ID#sku";
     private static final String EXTRA_DATA = "ID#extraData";

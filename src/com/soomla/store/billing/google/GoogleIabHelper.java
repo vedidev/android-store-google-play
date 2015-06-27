@@ -30,10 +30,9 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.text.TextUtils;
-
-import com.soomla.SoomlaConfig;
-import com.soomla.SoomlaApp;
 import com.android.vending.billing.IInAppBillingService;
+import com.soomla.SoomlaApp;
+import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
 import com.soomla.store.billing.IabException;
 import com.soomla.store.billing.IabHelper;
@@ -41,7 +40,6 @@ import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabSkuDetails;
-
 import org.json.JSONException;
 
 import java.util.ArrayList;
