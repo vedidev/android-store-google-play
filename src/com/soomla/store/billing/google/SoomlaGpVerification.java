@@ -4,10 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.text.TextUtils;
-
 import com.soomla.BusProvider;
 import com.soomla.SoomlaApp;
-import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.domain.PurchasableVirtualItem;
@@ -23,18 +21,14 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * @author vedi
@@ -51,9 +45,8 @@ public class SoomlaGpVerification {
     private final String clientId;
     private final String clientSecret;
     private final String refreshToken;
-    private boolean repeat = false;
-    private boolean repeated = false;
     private String errorMessage;
+    private String accessToken = null;
 
     public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken) {
 
@@ -72,16 +65,13 @@ public class SoomlaGpVerification {
     }
 
     private boolean verifyPurchase() {
-        String accessToken = GooglePlayIabService.getInstance().getAccessToken();
-        // access token has not been defined yet, force to get it
         if (TextUtils.isEmpty(accessToken)) {
-            repeat = true;
-            return false;
+            throw new IllegalStateException();
         }
 
         String purchaseToken = this.purchase.getToken();
 
-        if (purchaseToken != null) {
+            if (purchaseToken != null) {
             JSONObject jsonObject = new JSONObject();
             try {
                 jsonObject.put("purchaseToken", purchaseToken);
@@ -118,12 +108,8 @@ public class SoomlaGpVerification {
                 }
                 JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
                 if (statusCode < 200 || statusCode > 299) {
-                    if ("Invalid Credentials".equals(resultJsonObject.optString("error"))) {
-                        this.repeat = true;
-                    } else {
-                        fireError("There was a problem when verifying. Will try again later.");
-                    }
-                    return true;
+                    fireError("There was a problem when verifying. Will try again later.");
+                    return !"Invalid Credentials".equals(resultJsonObject.optString("error"));
                 }
                 return resultJsonObject.optBoolean("verified", false);
 
@@ -160,13 +146,11 @@ public class SoomlaGpVerification {
         runAsync(new Runnable() {
             @Override
             public void run() {
-                boolean result = verifyPurchase();
-                if (repeat && !repeated) {   // we repeat just once
-                    if (refreshToken()) {
-                        repeated = true;
-                        verifyPurchaseAsync();
-                        return;
-                    }
+                boolean result;
+                if (refreshToken()) {
+                    result = verifyPurchase();
+                } else {
+                    result = false;
                 }
 
                 if (result) {
@@ -180,6 +164,7 @@ public class SoomlaGpVerification {
     }
 
     private boolean refreshToken() {
+        this.accessToken = null;
         try {
             HttpClient client = new DefaultHttpClient();
             HttpPost post = new HttpPost(GOOGLE_AUTH_URL);
@@ -215,13 +200,9 @@ public class SoomlaGpVerification {
                 return false;
             }
 
-            String accessToken = resultJsonObject.optString("access_token");
-            if (accessToken != null) {
-                GooglePlayIabService.getInstance().setAccessToken(accessToken);
-                return true;
-            } else {
-                return false;
-            }
+            this.accessToken = resultJsonObject.optString("access_token");
+
+            return !TextUtils.isEmpty(this.accessToken);
         } catch (Exception e) {
             return false;
         }
