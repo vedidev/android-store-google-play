@@ -21,7 +21,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
-
 import com.soomla.SoomlaApp;
 import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
@@ -188,7 +187,7 @@ public class GooglePlayIabService implements IIabService {
                 KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
                 KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
                 KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY));
-        sv.verifyPurchaseAsync();
+        sv.verifyPurchase();
     }
 
     public void setAccessToken(String token) {

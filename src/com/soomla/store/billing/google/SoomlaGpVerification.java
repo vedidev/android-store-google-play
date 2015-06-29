@@ -64,68 +64,6 @@ public class SoomlaGpVerification {
         this.pvi = pvi;
     }
 
-    private boolean verifyPurchase() {
-        if (TextUtils.isEmpty(accessToken)) {
-            throw new IllegalStateException();
-        }
-
-        String purchaseToken = this.purchase.getToken();
-
-            if (purchaseToken != null) {
-            JSONObject jsonObject = new JSONObject();
-            try {
-                jsonObject.put("purchaseToken", purchaseToken);
-                jsonObject.put("packageName", this.purchase.getPackageName());
-                jsonObject.put("productId", this.purchase.getSku());
-                jsonObject.put("accessToken", accessToken);
-                SoomlaUtils.LogDebug(TAG, String.format("verifying purchase on server: %s", VERIFY_URL));
-
-                SharedPreferences prefs = SoomlaApp.getAppContext().
-                        getSharedPreferences("store.verification.prefs", Context.MODE_PRIVATE);
-                Map<String, ?> extraData = prefs.getAll();
-                if (extraData != null && !extraData.keySet().isEmpty()) {
-                    for (String key : extraData.keySet()) {
-                        jsonObject.put(key, extraData.get(key));
-                    }
-                }
-
-                HttpResponse resp = doVerifyPost(jsonObject);
-
-                if (resp == null) {
-                    fireError("Failed to connect to verification server. Not doing anything ... the purchasing process will happen again next time the service is initialized.");
-                    return true;
-                }
-
-                int statusCode = resp.getStatusLine().getStatusCode();
-
-                StringBuilder stringBuilder = new StringBuilder();
-                InputStream inputStream = resp.getEntity().getContent();
-                Reader reader = new BufferedReader(new InputStreamReader(inputStream));
-                final char[] buffer = new char[1024];
-                int bytesRead;
-                while ((bytesRead = reader.read(buffer, 0, buffer.length)) > 0) {
-                    stringBuilder.append(buffer, 0, bytesRead);
-                }
-                JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
-                if (statusCode < 200 || statusCode > 299) {
-                    fireError("There was a problem when verifying. Will try again later.");
-                    return !"Invalid Credentials".equals(resultJsonObject.optString("error"));
-                }
-                return resultJsonObject.optBoolean("verified", false);
-
-            } catch (JSONException e) {
-                fireError("Cannot build up json for verification: " + e);
-                return true;
-            } catch (Exception e) {
-                fireError(e.getMessage());
-                return true;
-            }
-        } else {
-            fireError("An error occurred while trying to get receipt purchaseToken. Stopping the purchasing process for: " + purchase.getSku());
-            return true;
-        }
-    }
-
     private HttpResponse doVerifyPost(JSONObject jsonObject) throws Exception {
         HttpClient client = new DefaultHttpClient();
         HttpPost post = new HttpPost(VERIFY_URL);
@@ -142,13 +80,79 @@ public class SoomlaGpVerification {
         errorMessage = message;
     }
 
-    public void verifyPurchaseAsync() {
+    public void verifyPurchase() {
         runAsync(new Runnable() {
             @Override
             public void run() {
+
                 boolean result;
+
                 if (refreshToken()) {
-                    result = verifyPurchase();
+
+                    if (TextUtils.isEmpty(accessToken)) {
+                        throw new IllegalStateException();
+                    }
+
+                    IabPurchase purchase = SoomlaGpVerification.this.purchase;
+
+                    String purchaseToken = purchase.getToken();
+
+                    if (purchaseToken != null) {
+                        JSONObject jsonObject = new JSONObject();
+                        try {
+                            jsonObject.put("purchaseToken", purchaseToken);
+                            jsonObject.put("packageName", purchase.getPackageName());
+                            jsonObject.put("productId", purchase.getSku());
+                            jsonObject.put("accessToken", accessToken);
+                            SoomlaUtils.LogDebug(TAG, String.format("verifying purchase on server: %s", VERIFY_URL));
+
+                            SharedPreferences prefs = SoomlaApp.getAppContext().
+                                    getSharedPreferences("store.verification.prefs", Context.MODE_PRIVATE);
+                            Map<String, ?> extraData = prefs.getAll();
+                            if (extraData != null && !extraData.keySet().isEmpty()) {
+                                for (String key : extraData.keySet()) {
+                                    jsonObject.put(key, extraData.get(key));
+                                }
+                            }
+
+                            HttpResponse resp = doVerifyPost(jsonObject);
+
+                            if (resp != null) {
+                                int statusCode = resp.getStatusLine().getStatusCode();
+
+                                StringBuilder stringBuilder = new StringBuilder();
+                                InputStream inputStream = resp.getEntity().getContent();
+                                Reader reader = new BufferedReader(new InputStreamReader(inputStream));
+                                final char[] buffer = new char[1024];
+                                int bytesRead;
+                                while ((bytesRead = reader.read(buffer, 0, buffer.length)) > 0) {
+                                    stringBuilder.append(buffer, 0, bytesRead);
+                                }
+                                JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
+                                if (statusCode >= 200 && statusCode <= 299) {
+                                    result = resultJsonObject.optBoolean("verified", false);
+                                } else {
+                                    fireError("There was a problem when verifying. Will try again later.");
+                                    result = !"Invalid Credentials".equals(resultJsonObject.optString("error"));
+                                }
+                            } else {
+                                fireError("Failed to connect to verification server. Not doing anything ... " +
+                                        "the purchasing process will happen again next time the service is " +
+                                        "initialized.");
+                                result = true;
+                            }
+                        } catch (JSONException e) {
+                            fireError("Cannot build up json for verification: " + e);
+                            result = true;
+                        } catch (Exception e) {
+                            fireError(e.getMessage());
+                            result = true;
+                        }
+                    } else {
+                        fireError("An error occurred while trying to get receipt purchaseToken. " +
+                                "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
+                        result = true;
+                    }
                 } else {
                     result = false;
                 }
