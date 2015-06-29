@@ -1,9 +1,13 @@
 package com.soomla.store.billing.google;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.text.TextUtils;
 
 import com.soomla.BusProvider;
+import com.soomla.SoomlaApp;
+import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.domain.PurchasableVirtualItem;
@@ -26,7 +30,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author vedi
@@ -81,6 +89,15 @@ public class SoomlaGpVerification {
                 jsonObject.put("productId", this.purchase.getSku());
                 jsonObject.put("accessToken", accessToken);
                 SoomlaUtils.LogDebug(TAG, String.format("verifying purchase on server: %s", VERIFY_URL));
+
+                SharedPreferences prefs = SoomlaApp.getAppContext().
+                        getSharedPreferences("store.verification.prefs", Context.MODE_PRIVATE);
+                Map<String, ?> extraData = prefs.getAll();
+                if (extraData != null && !extraData.keySet().isEmpty()) {
+                    for (String key : extraData.keySet()) {
+                        jsonObject.put(key, extraData.get(key));
+                    }
+                }
 
                 HttpResponse resp = doVerifyPost(jsonObject);
 
