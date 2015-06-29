@@ -85,7 +85,8 @@ public class SoomlaGpVerification {
             @Override
             public void run() {
 
-                boolean result;
+                boolean success;
+                boolean verified = false;
 
                 if (refreshToken()) {
 
@@ -130,36 +131,37 @@ public class SoomlaGpVerification {
                                 }
                                 JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
                                 if (statusCode >= 200 && statusCode <= 299) {
-                                    result = resultJsonObject.optBoolean("verified", false);
+                                    verified = resultJsonObject.optBoolean("verified", false);
+                                    success = true;
                                 } else {
                                     fireError("There was a problem when verifying. Will try again later.");
-                                    result = !"Invalid Credentials".equals(resultJsonObject.optString("error"));
+                                    success = !"Invalid Credentials".equals(resultJsonObject.optString("error"));
                                 }
                             } else {
                                 fireError("Failed to connect to verification server. Not doing anything ... " +
                                         "the purchasing process will happen again next time the service is " +
                                         "initialized.");
-                                result = true;
+                                success = true;
                             }
                         } catch (JSONException e) {
                             fireError("Cannot build up json for verification: " + e);
-                            result = true;
+                            success = true;
                         } catch (Exception e) {
                             fireError(e.getMessage());
-                            result = true;
+                            success = true;
                         }
                     } else {
                         fireError("An error occurred while trying to get receipt purchaseToken. " +
                                 "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
-                        result = true;
+                        success = true;
                     }
                 } else {
-                    result = false;
+                    success = false;
                 }
 
-                if (result) {
+                if (success) {
                     // I did this according, how we have this in iOS, however `verified` will be always `true` in the event.
-                    BusProvider.getInstance().post(new MarketPurchaseVerificationEvent(pvi, true, purchase));
+                    BusProvider.getInstance().post(new MarketPurchaseVerificationEvent(pvi, verified, purchase));
                 } else {
                     BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorMessage));
                 }
