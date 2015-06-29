@@ -13,6 +13,7 @@ import com.soomla.store.events.MarketPurchaseVerificationEvent;
 import com.soomla.store.events.UnexpectedStoreErrorEvent;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
@@ -23,9 +24,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,18 +67,29 @@ public class SoomlaGpVerification {
         this.pvi = pvi;
     }
 
-    private HttpResponse doVerifyPost(JSONObject jsonObject) throws Exception {
+    private HttpResponse doVerifyPost(JSONObject jsonObject) {
         HttpClient client = new DefaultHttpClient();
         HttpPost post = new HttpPost(VERIFY_URL);
         post.setHeader("Content-type", "application/json");
 
         String body = jsonObject.toString();
-        post.setEntity(new StringEntity(body, "UTF8"));
+        try {
+            post.setEntity(new StringEntity(body, "UTF8"));
+            return client.execute(post);
+        } catch (UnsupportedEncodingException e) {
+            setError(e.getMessage());
+            return null;
+        } catch (ClientProtocolException e) {
+            setError(e.getMessage());
+            return null;
+        } catch (IOException e) {
+            setError(e.getMessage());
+            return null;
+        }
 
-        return client.execute(post);
     }
 
-    private void fireError(String message) {
+    private void setError(String message) {
         SoomlaUtils.LogError(TAG, message);
         errorMessage = message;
     }
@@ -87,6 +101,8 @@ public class SoomlaGpVerification {
 
                 boolean success;
                 boolean verified = false;
+
+                UnexpectedStoreErrorEvent.ErrorCode errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
 
                 if (refreshToken()) {
 
@@ -134,24 +150,23 @@ public class SoomlaGpVerification {
                                     verified = resultJsonObject.optBoolean("verified", false);
                                     success = true;
                                 } else {
-                                    fireError("There was a problem when verifying. Will try again later.");
+                                    setError("There was a problem when verifying. Will try again later.");
                                     success = !"Invalid Credentials".equals(resultJsonObject.optString("error"));
                                 }
                             } else {
-                                fireError("Failed to connect to verification server. Not doing anything ... " +
-                                        "the purchasing process will happen again next time the service is " +
-                                        "initialized.");
+                                // we already set error in `doVerifyPost`
                                 success = true;
+                                errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
                             }
                         } catch (JSONException e) {
-                            fireError("Cannot build up json for verification: " + e);
+                            setError("Cannot build up json for verification: " + e);
                             success = true;
                         } catch (Exception e) {
-                            fireError(e.getMessage());
+                            setError(e.getMessage());
                             success = true;
                         }
                     } else {
-                        fireError("An error occurred while trying to get receipt purchaseToken. " +
+                        setError("An error occurred while trying to get receipt purchaseToken. " +
                                 "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                         success = true;
                     }
@@ -163,7 +178,7 @@ public class SoomlaGpVerification {
                     // I did this according, how we have this in iOS, however `verified` will be always `true` in the event.
                     BusProvider.getInstance().post(new MarketPurchaseVerificationEvent(pvi, verified, purchase));
                 } else {
-                    BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorMessage));
+                    BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorCode, errorMessage));
                 }
             }
         });
@@ -186,7 +201,7 @@ public class SoomlaGpVerification {
             HttpResponse resp = client.execute(post);
 
             if (resp == null) {
-                fireError("Failed to connect to google server.");
+                setError("Failed to connect to google server.");
                 return false;
             }
 
@@ -202,7 +217,7 @@ public class SoomlaGpVerification {
 
             int statusCode = resp.getStatusLine().getStatusCode();
             if (statusCode < 200 || statusCode > 299) {
-                fireError("There was a problem when verifying. Will try again later.");
+                setError("There was a problem when verifying. Will try again later.");
                 return false;
             }
 
