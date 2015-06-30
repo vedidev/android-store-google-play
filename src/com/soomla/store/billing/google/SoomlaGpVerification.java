@@ -13,7 +13,6 @@ import com.soomla.store.events.MarketPurchaseVerificationEvent;
 import com.soomla.store.events.UnexpectedStoreErrorEvent;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
@@ -28,7 +27,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,10 +46,11 @@ public class SoomlaGpVerification {
     private final String clientId;
     private final String clientSecret;
     private final String refreshToken;
+    private final boolean verifyOnServerFailure;
     private String errorMessage;
     private String accessToken = null;
 
-    public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken) {
+    public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken, boolean verifyOnServerFailure) {
 
         if (purchase == null || pvi == null || TextUtils.isEmpty(clientId) || TextUtils.isEmpty(clientSecret) || TextUtils.isEmpty(refreshToken)) {
             SoomlaUtils.LogError(TAG, "Can't initialize SoomlaGpVerification. Missing params.");
@@ -61,32 +60,20 @@ public class SoomlaGpVerification {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.refreshToken = refreshToken;
-
+        this.verifyOnServerFailure = verifyOnServerFailure;
 
         this.purchase = purchase;
         this.pvi = pvi;
     }
 
-    private HttpResponse doVerifyPost(JSONObject jsonObject) {
+    private HttpResponse doVerifyPost(JSONObject jsonObject) throws IOException {
         HttpClient client = new DefaultHttpClient();
         HttpPost post = new HttpPost(VERIFY_URL);
         post.setHeader("Content-type", "application/json");
 
         String body = jsonObject.toString();
-        try {
-            post.setEntity(new StringEntity(body, "UTF8"));
-            return client.execute(post);
-        } catch (UnsupportedEncodingException e) {
-            setError(e.getMessage());
-            return null;
-        } catch (ClientProtocolException e) {
-            setError(e.getMessage());
-            return null;
-        } catch (IOException e) {
-            setError(e.getMessage());
-            return null;
-        }
-
+        post.setEntity(new StringEntity(body, "UTF8"));
+        return client.execute(post);
     }
 
     private void setError(String message) {
@@ -99,24 +86,24 @@ public class SoomlaGpVerification {
             @Override
             public void run() {
 
-                boolean success;
+                boolean success = SoomlaGpVerification.this.verifyOnServerFailure;
                 boolean verified = false;
 
                 UnexpectedStoreErrorEvent.ErrorCode errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
 
-                if (refreshToken()) {
+                try {
+                    if (refreshToken()) {
 
-                    if (TextUtils.isEmpty(accessToken)) {
-                        throw new IllegalStateException();
-                    }
+                        if (TextUtils.isEmpty(accessToken)) {
+                            throw new IllegalStateException();
+                        }
 
-                    IabPurchase purchase = SoomlaGpVerification.this.purchase;
+                        IabPurchase purchase = SoomlaGpVerification.this.purchase;
 
-                    String purchaseToken = purchase.getToken();
+                        String purchaseToken = purchase.getToken();
 
-                    if (purchaseToken != null) {
-                        JSONObject jsonObject = new JSONObject();
-                        try {
+                        if (purchaseToken != null) {
+                            JSONObject jsonObject = new JSONObject();
                             jsonObject.put("purchaseToken", purchaseToken);
                             jsonObject.put("packageName", purchase.getPackageName());
                             jsonObject.put("productId", purchase.getSku());
@@ -151,27 +138,27 @@ public class SoomlaGpVerification {
                                     success = true;
                                 } else {
                                     setError("There was a problem when verifying. Will try again later.");
-                                    success = !"Invalid Credentials".equals(resultJsonObject.optString("error"));
+                                    success = success && !"Invalid Credentials".equals(resultJsonObject.optString("error"));
                                 }
                             } else {
                                 // we already set error in `doVerifyPost`
-                                success = true;
                                 errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
                             }
-                        } catch (JSONException e) {
-                            setError("Cannot build up json for verification: " + e);
-                            success = true;
-                        } catch (Exception e) {
-                            setError(e.getMessage());
-                            success = true;
-                        }
-                    } else {
+                        } else {
                         setError("An error occurred while trying to get receipt purchaseToken. " +
                                 "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
-                        success = true;
+                        }
+                    } else {
+                        setError("Cannot refresh token");
+                        success = false;
                     }
-                } else {
-                    success = false;
+
+                } catch (JSONException e) {
+                    setError("Cannot build up json for verification: " + e);
+                    errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
+                } catch (IOException e) {
+                    setError(e.getMessage());
+                    errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
                 }
 
                 if (success) {
@@ -184,50 +171,45 @@ public class SoomlaGpVerification {
         });
     }
 
-    private boolean refreshToken() {
+    private boolean refreshToken() throws IOException, JSONException {
         this.accessToken = null;
-        try {
-            HttpClient client = new DefaultHttpClient();
-            HttpPost post = new HttpPost(GOOGLE_AUTH_URL);
+        HttpClient client = new DefaultHttpClient();
+        HttpPost post = new HttpPost(GOOGLE_AUTH_URL);
 
-            List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-            urlParameters.add(new BasicNameValuePair("grant_type", "refresh_token"));
-            urlParameters.add(new BasicNameValuePair("client_id", clientId));
-            urlParameters.add(new BasicNameValuePair("client_secret", clientSecret));
-            urlParameters.add(new BasicNameValuePair("refresh_token", refreshToken));
+        List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+        urlParameters.add(new BasicNameValuePair("grant_type", "refresh_token"));
+        urlParameters.add(new BasicNameValuePair("client_id", clientId));
+        urlParameters.add(new BasicNameValuePair("client_secret", clientSecret));
+        urlParameters.add(new BasicNameValuePair("refresh_token", refreshToken));
 
-            post.setEntity(new UrlEncodedFormEntity(urlParameters));
+        post.setEntity(new UrlEncodedFormEntity(urlParameters));
 
-            HttpResponse resp = client.execute(post);
+        HttpResponse resp = client.execute(post);
 
-            if (resp == null) {
-                setError("Failed to connect to google server.");
-                return false;
-            }
-
-            StringBuilder stringBuilder = new StringBuilder();
-            InputStream inputStream = resp.getEntity().getContent();
-            Reader reader = new BufferedReader(new InputStreamReader(inputStream));
-            final char[] buffer = new char[1024];
-            int bytesRead;
-            while ((bytesRead = reader.read(buffer, 0, buffer.length)) > 0) {
-                stringBuilder.append(buffer, 0, bytesRead);
-            }
-            JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
-
-            int statusCode = resp.getStatusLine().getStatusCode();
-            if (statusCode < 200 || statusCode > 299) {
-                setError("There was a problem when verifying. Will try again later.");
-                return false;
-            }
-
-            this.accessToken = resultJsonObject.optString("access_token");
-
-            return !TextUtils.isEmpty(this.accessToken);
-        } catch (Exception e) {
+        if (resp == null) {
+            setError("Failed to connect to google server.");
             return false;
         }
 
+        StringBuilder stringBuilder = new StringBuilder();
+        InputStream inputStream = resp.getEntity().getContent();
+        Reader reader = new BufferedReader(new InputStreamReader(inputStream));
+        final char[] buffer = new char[1024];
+        int bytesRead;
+        while ((bytesRead = reader.read(buffer, 0, buffer.length)) > 0) {
+            stringBuilder.append(buffer, 0, bytesRead);
+        }
+        JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
+
+        int statusCode = resp.getStatusLine().getStatusCode();
+        if (statusCode < 200 || statusCode > 299) {
+            setError("There was a problem when verifying. Will try again later.");
+            return false;
+        }
+
+        this.accessToken = resultJsonObject.optString("access_token");
+
+        return !TextUtils.isEmpty(this.accessToken);
     }
 
     private static void runAsync(final Runnable runnable) {
