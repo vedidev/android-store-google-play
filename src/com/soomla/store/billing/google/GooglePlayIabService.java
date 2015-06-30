@@ -21,7 +21,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
-
 import com.soomla.SoomlaApp;
 import com.soomla.SoomlaConfig;
 import com.soomla.SoomlaUtils;
@@ -157,7 +156,7 @@ public class GooglePlayIabService implements IIabService {
     }
 
     @Override
-    public void configVerifyPurchases(Map<String, String> config) {
+    public void configVerifyPurchases(Map<String, Object> config) {
 
         KeyValueStorage.deleteKeyValue(VERIFY_PURCHASES_KEY);
         KeyValueStorage.deleteKeyValue(VERIFY_CLIENT_ID_KEY);
@@ -165,17 +164,23 @@ public class GooglePlayIabService implements IIabService {
         KeyValueStorage.deleteKeyValue(VERIFY_REFRESH_TOKEN_KEY);
         if (config != null) {
             try {
-                checkConfigItem(config, "clientId");
-                checkConfigItem(config, "clientSecret");
-                checkConfigItem(config, "refreshToken");
+                checkStringConfigItem(config, "clientId");
+                checkStringConfigItem(config, "clientSecret");
+                checkStringConfigItem(config, "refreshToken");
             } catch (IllegalArgumentException e) {
                 SoomlaUtils.LogError(TAG, e.getMessage());
                 return;
             }
 
-            KeyValueStorage.setValue(VERIFY_CLIENT_ID_KEY, config.get("clientId"));
-            KeyValueStorage.setValue(VERIFY_CLIENT_SECRET_KEY, config.get("clientSecret"));
-            KeyValueStorage.setValue(VERIFY_REFRESH_TOKEN_KEY, config.get("refreshToken"));
+            Boolean verifyOnServerFailure = (Boolean) config.get("verifyOnServerFailure");
+            if (verifyOnServerFailure == null) {
+                verifyOnServerFailure = false;
+            }
+
+            KeyValueStorage.setValue(VERIFY_CLIENT_ID_KEY, (String) config.get("clientId"));
+            KeyValueStorage.setValue(VERIFY_CLIENT_SECRET_KEY, (String) config.get("clientSecret"));
+            KeyValueStorage.setValue(VERIFY_REFRESH_TOKEN_KEY, (String) config.get("refreshToken"));
+            KeyValueStorage.setValue(VERIFY_ON_SERVER_FAILURE, verifyOnServerFailure.toString());
 
             KeyValueStorage.setValue(VERIFY_PURCHASES_KEY, "yes");
         }
@@ -187,8 +192,10 @@ public class GooglePlayIabService implements IIabService {
         SoomlaGpVerification sv = new SoomlaGpVerification(purchase, pvi,
                 KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
                 KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
-                KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY));
-        sv.verifyPurchaseAsync();
+                KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY),
+                Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE))
+                );
+        sv.verifyPurchase();
     }
 
     public void setAccessToken(String token) {
@@ -553,9 +560,9 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
-    private void checkConfigItem(Map<String, String> config, String key) {
-        String strToCheck = config.get(key);
-        if (TextUtils.isEmpty(strToCheck)) {
+    private void checkStringConfigItem(Map<String, Object> config, String key) {
+        Object strToCheck = config.get(key);
+        if (strToCheck == null || !(strToCheck instanceof String) || TextUtils.isEmpty((String) strToCheck)) {
             throw new IllegalArgumentException("Please, provide value for " + key);
         }
     }
@@ -574,6 +581,7 @@ public class GooglePlayIabService implements IIabService {
     public static final String PUBLICKEY_KEY = "PO#SU#SO#GU";
 
     public static final String VERIFY_PURCHASES_KEY = "soomla.verification.verifyPurchases";
+    public static final String VERIFY_ON_SERVER_FAILURE = "soomla.verification.verifyOnServerFailure";
     public static final String VERIFY_REFRESH_TOKEN_KEY = "soomla.verification.refreshToken";
     public static final String VERIFY_CLIENT_ID_KEY = "soomla.verification.clientId";
     public static final String VERIFY_CLIENT_SECRET_KEY = "soomla.verification.clientSecret";
