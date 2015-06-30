@@ -174,7 +174,7 @@ public class GooglePlayIabService implements IIabService {
 
             Boolean verifyOnServerFailure = (Boolean) config.get("verifyOnServerFailure");
             if (verifyOnServerFailure == null) {
-                verifyOnServerFailure = true;
+                verifyOnServerFailure = false;
             }
 
             KeyValueStorage.setValue(VERIFY_CLIENT_ID_KEY, (String) config.get("clientId"));
