@@ -47,7 +47,6 @@ public class SoomlaGpVerification {
     private final String clientSecret;
     private final String refreshToken;
     private final boolean verifyOnServerFailure;
-    private String errorMessage;
     private String accessToken = null;
 
     public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken, boolean verifyOnServerFailure) {
@@ -74,11 +73,6 @@ public class SoomlaGpVerification {
         String body = jsonObject.toString();
         post.setEntity(new StringEntity(body, "UTF8"));
         return client.execute(post);
-    }
-
-    private void setError(String message) {
-        SoomlaUtils.LogError(TAG, message);
-        errorMessage = message;
     }
 
     public void verifyPurchase() {
@@ -137,7 +131,7 @@ public class SoomlaGpVerification {
                                     verified = resultJsonObject.optBoolean("verified", false);
                                     success = true;
                                 } else {
-                                    setError("There was a problem when verifying. Will try again later.");
+                                    SoomlaUtils.LogError(TAG, "There was a problem when verifying. Will try again later.");
                                     success = success && !"Invalid Credentials".equals(resultJsonObject.optString("error"));
                                 }
                             } else {
@@ -145,19 +139,19 @@ public class SoomlaGpVerification {
                                 errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
                             }
                         } else {
-                        setError("An error occurred while trying to get receipt purchaseToken. " +
+                        SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
                                 "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                         }
                     } else {
-                        setError("Cannot refresh token");
+                        SoomlaUtils.LogError(TAG, "Cannot refresh token");
                         success = false;
                     }
 
                 } catch (JSONException e) {
-                    setError("Cannot build up json for verification: " + e);
+                    SoomlaUtils.LogError(TAG, "Cannot build up json for verification: " + e);
                     errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
                 } catch (IOException e) {
-                    setError(e.getMessage());
+                    SoomlaUtils.LogError(TAG, e.getMessage());
                     errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
                 }
 
@@ -165,7 +159,7 @@ public class SoomlaGpVerification {
                     // I did this according, how we have this in iOS, however `verified` will be always `true` in the event.
                     BusProvider.getInstance().post(new MarketPurchaseVerificationEvent(pvi, verified, purchase));
                 } else {
-                    BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorCode, errorMessage));
+                    BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorCode));
                 }
             }
         });
@@ -187,7 +181,7 @@ public class SoomlaGpVerification {
         HttpResponse resp = client.execute(post);
 
         if (resp == null) {
-            setError("Failed to connect to google server.");
+            SoomlaUtils.LogError(TAG, "Failed to connect to google server.");
             return false;
         }
 
@@ -203,7 +197,7 @@ public class SoomlaGpVerification {
 
         int statusCode = resp.getStatusLine().getStatusCode();
         if (statusCode < 200 || statusCode > 299) {
-            setError("There was a problem when verifying. Will try again later.");
+            SoomlaUtils.LogError(TAG, "There was a problem when verifying. Will try again later.");
             return false;
         }
 
