@@ -19,6 +19,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import com.soomla.SoomlaApp;
@@ -39,6 +41,8 @@ import com.soomla.store.domain.PurchasableVirtualItem;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * This is the Google Play plugin implementation of IIabService.
@@ -195,7 +199,31 @@ public class GooglePlayIabService implements IIabService {
                 KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY),
                 Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE)),
                 callback);
-        sv.verifyPurchase();
+
+        synchronized (svList) {
+            svList.add(sv); // we put it into the list in order to guarantee they will be ran according their order
+        }
+
+        runVerification();
+    }
+
+    private void runVerification() {
+        runAsync(new Runnable() {
+            @Override
+            public void run() {
+                lock.lock();
+                try {
+                    final SoomlaGpVerification sv;
+                    synchronized (svList) {
+                        // we have exact the same number of items, how many tasks are ran, it always should have an item at this point
+                        sv = svList.remove(0);
+                    }
+                    sv.verifyPurchase();
+                } finally {
+                    lock.unlock();
+                }
+            }
+        });
     }
 
     public void setAccessToken(String token) {
@@ -567,6 +595,24 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
+    private static void runAsync(final Runnable runnable) {
+        AsyncTask<Void, Void, Void> asyncTask = new AsyncTask<Void, Void, Void>() {
+            @Override
+            protected Void doInBackground(Void... params) {
+                runnable.run();
+                return null;
+            }
+        };
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            asyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null, null);
+        }
+        else {
+            asyncTask.execute(null, null);
+        }
+    }
+
     public static GooglePlayIabService getInstance() {
         return (GooglePlayIabService) SoomlaStore.getInstance().getInAppBillingService();
     }
@@ -590,6 +636,9 @@ public class GooglePlayIabService implements IIabService {
     private static final String SKU = "ID#sku";
     private static final String EXTRA_DATA = "ID#extraData";
     private IabCallbacks.OnPurchaseListener mSavedOnPurchaseListener = null;
+
+    private final List<SoomlaGpVerification> svList = new ArrayList<SoomlaGpVerification>();
+    private Lock lock = new ReentrantLock();
 
     /**
      * When set to true, this removes the need to verify purchases when there's no signature.

@@ -2,7 +2,6 @@ package com.soomla.store.billing.google;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.AsyncTask;
 import android.text.TextUtils;
 import com.soomla.BusProvider;
 import com.soomla.SoomlaApp;
@@ -84,95 +83,89 @@ public class SoomlaGpVerification {
     }
 
     public void verifyPurchase() {
-        runAsync(new Runnable() {
-            @Override
-            public void run() {
+        boolean success = SoomlaGpVerification.this.verifyOnServerFailure;
+        boolean verified = false;
 
-                boolean success = SoomlaGpVerification.this.verifyOnServerFailure;
-                boolean verified = false;
+        UnexpectedStoreErrorEvent.ErrorCode errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
 
-                UnexpectedStoreErrorEvent.ErrorCode errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
+        try {
+            if (refreshToken()) {
 
-                try {
-                    if (refreshToken()) {
+                if (TextUtils.isEmpty(accessToken)) {
+                    throw new IllegalStateException();
+                }
 
-                        if (TextUtils.isEmpty(accessToken)) {
-                            throw new IllegalStateException();
+                IabPurchase purchase = SoomlaGpVerification.this.purchase;
+
+                String purchaseToken = purchase.getToken();
+
+                if (purchaseToken != null) {
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.put("purchaseToken", purchaseToken);
+                    jsonObject.put("packageName", purchase.getPackageName());
+                    jsonObject.put("productId", purchase.getSku());
+                    jsonObject.put("accessToken", accessToken);
+                    SoomlaUtils.LogDebug(TAG, String.format("verifying purchase on server: %s", VERIFY_URL));
+
+                    SharedPreferences prefs = SoomlaApp.getAppContext().
+                            getSharedPreferences("store.verification.prefs", Context.MODE_PRIVATE);
+                    Map<String, ?> extraData = prefs.getAll();
+                    if (extraData != null && !extraData.keySet().isEmpty()) {
+                        for (String key : extraData.keySet()) {
+                            jsonObject.put(key, extraData.get(key));
                         }
-
-                        IabPurchase purchase = SoomlaGpVerification.this.purchase;
-
-                        String purchaseToken = purchase.getToken();
-
-                        if (purchaseToken != null) {
-                            JSONObject jsonObject = new JSONObject();
-                            jsonObject.put("purchaseToken", purchaseToken);
-                            jsonObject.put("packageName", purchase.getPackageName());
-                            jsonObject.put("productId", purchase.getSku());
-                            jsonObject.put("accessToken", accessToken);
-                            SoomlaUtils.LogDebug(TAG, String.format("verifying purchase on server: %s", VERIFY_URL));
-
-                            SharedPreferences prefs = SoomlaApp.getAppContext().
-                                    getSharedPreferences("store.verification.prefs", Context.MODE_PRIVATE);
-                            Map<String, ?> extraData = prefs.getAll();
-                            if (extraData != null && !extraData.keySet().isEmpty()) {
-                                for (String key : extraData.keySet()) {
-                                    jsonObject.put(key, extraData.get(key));
-                                }
-                            }
-
-                            HttpResponse resp = doVerifyPost(jsonObject);
-
-                            if (resp != null) {
-                                int statusCode = resp.getStatusLine().getStatusCode();
-
-                                StringBuilder stringBuilder = new StringBuilder();
-                                InputStream inputStream = resp.getEntity().getContent();
-                                Reader reader = new BufferedReader(new InputStreamReader(inputStream));
-                                final char[] buffer = new char[1024];
-                                int bytesRead;
-                                while ((bytesRead = reader.read(buffer, 0, buffer.length)) > 0) {
-                                    stringBuilder.append(buffer, 0, bytesRead);
-                                }
-                                JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
-                                if (statusCode >= 200 && statusCode <= 299) {
-                                    verified = resultJsonObject.optBoolean("verified", false);
-                                    success = true;
-                                } else {
-                                    setError("There was a problem when verifying. Will try again later.");
-                                    success = success && !"Invalid Credentials".equals(resultJsonObject.optString("error"));
-                                }
-                            } else {
-                                // we already set error in `doVerifyPost`
-                                errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
-                            }
-                        } else {
-                            setError("An error occurred while trying to get receipt purchaseToken. " +
-                                "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
-                        }
-                    } else {
-                        setError("Cannot refresh token");
-                        success = false;
                     }
 
-                } catch (JSONException e) {
-                    setError("Cannot build up json for verification: " + e);
-                    errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
-                } catch (IOException e) {
-                    setError(e.getMessage());
-                    errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
-                }
+                    HttpResponse resp = doVerifyPost(jsonObject);
 
-                if (success) {
-                    // I did this according, how we have this in iOS, however `verified` will be always `true` in the event.
-                    BusProvider.getInstance().post(new MarketPurchaseVerificationEvent(pvi, verified, purchase));
+                    if (resp != null) {
+                        int statusCode = resp.getStatusLine().getStatusCode();
+
+                        StringBuilder stringBuilder = new StringBuilder();
+                        InputStream inputStream = resp.getEntity().getContent();
+                        Reader reader = new BufferedReader(new InputStreamReader(inputStream));
+                        final char[] buffer = new char[1024];
+                        int bytesRead;
+                        while ((bytesRead = reader.read(buffer, 0, buffer.length)) > 0) {
+                            stringBuilder.append(buffer, 0, bytesRead);
+                        }
+                        JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
+                        if (statusCode >= 200 && statusCode <= 299) {
+                            verified = resultJsonObject.optBoolean("verified", false);
+                            success = true;
+                        } else {
+                            setError("There was a problem when verifying. Will try again later.");
+                            success = success && !"Invalid Credentials".equals(resultJsonObject.optString("error"));
+                        }
+                    } else {
+                        // we already set error in `doVerifyPost`
+                        errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
+                    }
                 } else {
-                    BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorCode, errorMessage));
+                    setError("An error occurred while trying to get receipt purchaseToken. " +
+                            "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                 }
-
-                callback.run();
+            } else {
+                setError("Cannot refresh token");
+                success = false;
             }
-        });
+
+        } catch (JSONException e) {
+            setError("Cannot build up json for verification: " + e);
+            errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
+        } catch (IOException e) {
+            setError(e.getMessage());
+            errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
+        }
+
+        if (success) {
+            // I did this according, how we have this in iOS, however `verified` will be always `true` in the event.
+            BusProvider.getInstance().post(new MarketPurchaseVerificationEvent(pvi, verified, purchase));
+        } else {
+            BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorCode, errorMessage));
+        }
+
+        callback.run();
     }
 
     private boolean refreshToken() throws IOException, JSONException {
@@ -216,13 +209,4 @@ public class SoomlaGpVerification {
         return !TextUtils.isEmpty(this.accessToken);
     }
 
-    private static void runAsync(final Runnable runnable) {
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(Void... params) {
-                runnable.run();
-                return null;
-            }
-        }.execute(null, null);
-    }
 }
