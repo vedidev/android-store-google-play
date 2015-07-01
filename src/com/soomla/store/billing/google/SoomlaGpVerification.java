@@ -47,11 +47,11 @@ public class SoomlaGpVerification {
     private final String clientSecret;
     private final String refreshToken;
     private final boolean verifyOnServerFailure;
+    private final Runnable callback;
     private String errorMessage;
     private String accessToken = null;
 
-    public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken, boolean verifyOnServerFailure) {
-
+    public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken, boolean verifyOnServerFailure, Runnable callback) {
         if (purchase == null || pvi == null || TextUtils.isEmpty(clientId) || TextUtils.isEmpty(clientSecret) || TextUtils.isEmpty(refreshToken)) {
             SoomlaUtils.LogError(TAG, "Can't initialize SoomlaGpVerification. Missing params.");
             throw new IllegalArgumentException();
@@ -61,6 +61,8 @@ public class SoomlaGpVerification {
         this.clientSecret = clientSecret;
         this.refreshToken = refreshToken;
         this.verifyOnServerFailure = verifyOnServerFailure;
+
+        this.callback = callback;
 
         this.purchase = purchase;
         this.pvi = pvi;
@@ -145,7 +147,7 @@ public class SoomlaGpVerification {
                                 errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
                             }
                         } else {
-                        setError("An error occurred while trying to get receipt purchaseToken. " +
+                            setError("An error occurred while trying to get receipt purchaseToken. " +
                                 "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                         }
                     } else {
@@ -167,6 +169,8 @@ public class SoomlaGpVerification {
                 } else {
                     BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorCode, errorMessage));
                 }
+
+                callback.run();
             }
         });
     }

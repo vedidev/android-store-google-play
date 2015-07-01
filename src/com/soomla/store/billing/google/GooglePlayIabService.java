@@ -187,14 +187,14 @@ public class GooglePlayIabService implements IIabService {
     }
 
     @Override
-    public void verifyPurchase(IabPurchase purchase, PurchasableVirtualItem pvi) {
+    public void verifyPurchase(IabPurchase purchase, PurchasableVirtualItem pvi, Runnable callback) {
 
         SoomlaGpVerification sv = new SoomlaGpVerification(purchase, pvi,
                 KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
                 KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
                 KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY),
-                Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE))
-                );
+                Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE)),
+                callback);
         sv.verifyPurchase();
     }
 
