@@ -47,7 +47,6 @@ public class SoomlaGpVerification {
     private final String refreshToken;
     private final boolean verifyOnServerFailure;
     private final Runnable callback;
-    private String errorMessage;
     private String accessToken = null;
 
     public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken, boolean verifyOnServerFailure, Runnable callback) {
@@ -75,11 +74,6 @@ public class SoomlaGpVerification {
         String body = jsonObject.toString();
         post.setEntity(new StringEntity(body, "UTF8"));
         return client.execute(post);
-    }
-
-    private void setError(String message) {
-        SoomlaUtils.LogError(TAG, message);
-        errorMessage = message;
     }
 
     public void verifyPurchase() {
@@ -134,12 +128,12 @@ public class SoomlaGpVerification {
                             verified = resultJsonObject.optBoolean("verified", false);
                             success = true;
                         } else {
-                            setError("There was a problem when verifying. Will try again later.");
-                            success = success && !"Invalid Credentials".equals(resultJsonObject.optString("error"));
+                        SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
+                                "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                         }
                     } else {
-                        // we already set error in `doVerifyPost`
-                        errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
+                        SoomlaUtils.LogError(TAG, "Cannot refresh token");
+                        success = false;
                     }
                 } else {
                     setError("An error occurred while trying to get receipt purchaseToken. " +
@@ -184,7 +178,7 @@ public class SoomlaGpVerification {
         HttpResponse resp = client.execute(post);
 
         if (resp == null) {
-            setError("Failed to connect to google server.");
+            SoomlaUtils.LogError(TAG, "Failed to connect to google server.");
             return false;
         }
 
@@ -200,7 +194,7 @@ public class SoomlaGpVerification {
 
         int statusCode = resp.getStatusLine().getStatusCode();
         if (statusCode < 200 || statusCode > 299) {
-            setError("There was a problem when verifying. Will try again later.");
+            SoomlaUtils.LogError(TAG, "There was a problem when verifying. Will try again later.");
             return false;
         }
 
