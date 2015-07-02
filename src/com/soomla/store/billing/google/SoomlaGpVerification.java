@@ -3,12 +3,10 @@ package com.soomla.store.billing.google;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
-import com.soomla.BusProvider;
+
 import com.soomla.SoomlaApp;
 import com.soomla.SoomlaUtils;
 import com.soomla.store.billing.IabPurchase;
-import com.soomla.store.domain.PurchasableVirtualItem;
-import com.soomla.store.events.MarketPurchaseVerificationEvent;
 import com.soomla.store.events.UnexpectedStoreErrorEvent;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -41,16 +39,14 @@ public class SoomlaGpVerification {
     private static final String TAG = "SOOMLA SoomlaGpVerification";
 
     private final IabPurchase purchase;
-    private final PurchasableVirtualItem pvi;
     private final String clientId;
     private final String clientSecret;
     private final String refreshToken;
     private final boolean verifyOnServerFailure;
-    private final Runnable callback;
     private String accessToken = null;
 
-    public SoomlaGpVerification(IabPurchase purchase, PurchasableVirtualItem pvi, String clientId, String clientSecret, String refreshToken, boolean verifyOnServerFailure, Runnable callback) {
-        if (purchase == null || pvi == null || TextUtils.isEmpty(clientId) || TextUtils.isEmpty(clientSecret) || TextUtils.isEmpty(refreshToken)) {
+    public SoomlaGpVerification(IabPurchase purchase, String clientId, String clientSecret, String refreshToken, boolean verifyOnServerFailure) {
+        if (purchase == null || TextUtils.isEmpty(clientId) || TextUtils.isEmpty(clientSecret) || TextUtils.isEmpty(refreshToken)) {
             SoomlaUtils.LogError(TAG, "Can't initialize SoomlaGpVerification. Missing params.");
             throw new IllegalArgumentException();
         }
@@ -60,10 +56,7 @@ public class SoomlaGpVerification {
         this.refreshToken = refreshToken;
         this.verifyOnServerFailure = verifyOnServerFailure;
 
-        this.callback = callback;
-
         this.purchase = purchase;
-        this.pvi = pvi;
     }
 
     private HttpResponse doVerifyPost(JSONObject jsonObject) throws IOException {
@@ -80,7 +73,7 @@ public class SoomlaGpVerification {
         boolean success = SoomlaGpVerification.this.verifyOnServerFailure;
         boolean verified = false;
 
-        UnexpectedStoreErrorEvent.ErrorCode errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
+        UnexpectedStoreErrorEvent.ErrorCode errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
 
         try {
             if (refreshToken()) {
@@ -126,6 +119,12 @@ public class SoomlaGpVerification {
                         JSONObject resultJsonObject = new JSONObject(stringBuilder.toString());
                         if (statusCode >= 200 && statusCode <= 299) {
                             verified = resultJsonObject.optBoolean("verified", false);
+                            if (verified) {
+                                errorCode = null;
+                            } else {
+                                errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
+                                SoomlaUtils.LogError(TAG, "Failed to verify transaction receipt. The user will not get what he just bought.");
+                            }
                             success = true;
                         } else {
                         SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
@@ -133,33 +132,23 @@ public class SoomlaGpVerification {
                         }
                     } else {
                         SoomlaUtils.LogError(TAG, "Cannot refresh token");
-                        success = false;
                     }
                 } else {
-                    setError("An error occurred while trying to get receipt purchaseToken. " +
+                    SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
                             "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                 }
             } else {
-                setError("Cannot refresh token");
-                success = false;
+                SoomlaUtils.LogError(TAG, "Cannot refresh token");
             }
 
         } catch (JSONException e) {
-            setError("Cannot build up json for verification: " + e);
-            errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
+            SoomlaUtils.LogError(TAG, "Cannot build up json for verification: " + e);
         } catch (IOException e) {
-            setError(e.getMessage());
-            errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
+            SoomlaUtils.LogError(TAG, e.getMessage());
         }
 
-        if (success) {
-            // I did this according, how we have this in iOS, however `verified` will be always `true` in the event.
-            BusProvider.getInstance().post(new MarketPurchaseVerificationEvent(pvi, verified, purchase));
-        } else {
-            BusProvider.getInstance().post(new UnexpectedStoreErrorEvent(errorCode, errorMessage));
-        }
-
-        callback.run();
+        purchase.setServerVerified(verified || success);
+        purchase.setVerificationErrorCode(errorCode);
     }
 
     private boolean refreshToken() throws IOException, JSONException {

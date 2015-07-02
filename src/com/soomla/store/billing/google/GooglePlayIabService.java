@@ -19,9 +19,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.AsyncTask;
-import android.os.Build;
-import android.os.Bundle;
+import android.os.*;
+import android.os.Process;
 import android.text.TextUtils;
 import com.soomla.SoomlaApp;
 import com.soomla.SoomlaConfig;
@@ -123,7 +122,7 @@ public class GooglePlayIabService implements IIabService {
         mHelper.consumeAsync(purchase, new GoogleIabHelper.OnConsumeFinishedListener() {
             @Override
             public void onConsumeFinished(IabPurchase purchase, IabResult result) {
-                if(result.isSuccess()) {
+                if (result.isSuccess()) {
 
                     consumeListener.success(purchase);
                 } else {
@@ -155,7 +154,7 @@ public class GooglePlayIabService implements IIabService {
         edit.commit();
     }
 
-    public boolean getVerifyPurchases() {
+    private static boolean getVerifyPurchases() {
         return !TextUtils.isEmpty(KeyValueStorage.getValue(VERIFY_PURCHASES_KEY));
     }
 
@@ -190,40 +189,33 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
-    @Override
-    public void verifyPurchase(IabPurchase purchase, PurchasableVirtualItem pvi, Runnable callback) {
+    private void verifyPurchases(final List<IabPurchase> purchases, final VerifyPurchasesFinishedListener listener) {
 
-        SoomlaGpVerification sv = new SoomlaGpVerification(purchase, pvi,
-                KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
-                KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
-                KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY),
-                Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE)),
-                callback);
-
-        synchronized (svList) {
-            svList.add(sv); // we put it into the list in order to guarantee they will be ran according their order
-        }
-
-        runVerification();
-    }
-
-    private void runVerification() {
-        runAsync(new Runnable() {
+        new Thread(new Runnable() {
             @Override
             public void run() {
-                lock.lock();
-                try {
-                    final SoomlaGpVerification sv;
-                    synchronized (svList) {
-                        // we have exact the same number of items, how many tasks are ran, it always should have an item at this point
-                        sv = svList.remove(0);
-                    }
+                Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+
+                for (IabPurchase purchase : purchases) {
+
+                    SoomlaGpVerification sv = new SoomlaGpVerification(purchase,
+                            KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
+                            KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
+                            KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY),
+                            Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE)));
+
                     sv.verifyPurchase();
-                } finally {
-                    lock.unlock();
                 }
+
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        listener.finished();
+                    }
+                });
+
             }
-        });
+        }).start();
     }
 
     public void setAccessToken(String token) {
@@ -344,6 +336,12 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
+    public interface VerifyPurchasesFinishedListener {
+
+        public void finished();
+
+    }
+
     /**
      * Handle Restore Purchases processes
      */
@@ -362,19 +360,31 @@ public class GooglePlayIabService implements IIabService {
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mRestorePurchasesListener != null) {
                 // fetching owned items
                 List<String> itemSkus = inventory.getAllOwnedSkus(IabHelper.ITEM_TYPE_INAPP);
-                List<IabPurchase> purchases = new ArrayList<IabPurchase>();
+                final List<IabPurchase> purchases = new ArrayList<IabPurchase>();
                 for (String sku : itemSkus) {
                     IabPurchase purchase = inventory.getPurchase(sku);
                     purchases.add(purchase);
                 }
 
-                this.mRestorePurchasesListener.success(purchases);
+                if (getVerifyPurchases()) {
+                    verifyPurchases(purchases, new VerifyPurchasesFinishedListener() {
+                        @Override
+                        public void finished() {
+                            mRestorePurchasesListener.success(purchases);
+                            stopIabHelper(null);
+                        }
+                    });
+                } else {
+                    mRestorePurchasesListener.success(purchases);
+                    stopIabHelper(null);
+                }
+
             } else {
-                SoomlaUtils.LogError(TAG, "Wither mRestorePurchasesListener==null OR Restore purchases error: " + result.getMessage());
+                SoomlaUtils.LogError(TAG, "Either mRestorePurchasesListener==null OR Restore purchases error: " + result.getMessage());
                 if (this.mRestorePurchasesListener != null) this.mRestorePurchasesListener.fail(result.getMessage());
+                stopIabHelper(null);
             }
 
-            stopIabHelper(null);
         }
     }
 
@@ -453,7 +463,7 @@ public class GooglePlayIabService implements IIabService {
 
 
         @Override
-        public void onIabPurchaseFinished(IabResult result, IabPurchase purchase) {
+        public void onIabPurchaseFinished(IabResult result, final IabPurchase purchase) {
             /**
              * Wait to see if the purchase succeeded, then start the consumption process.
              */
@@ -462,8 +472,25 @@ public class GooglePlayIabService implements IIabService {
             GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
 
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK) {
+                if (getVerifyPurchases()) {
+                    List<IabPurchase> purchases = new ArrayList<IabPurchase>();
+                    purchases.add(purchase);
+                    GooglePlayIabService.getInstance().verifyPurchases(purchases, new VerifyPurchasesFinishedListener() {
+                        @Override
+                        public void finished() {
+                            GooglePlayIabService.getInstance().mSavedOnPurchaseListener.success(purchase);
+                            GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
 
-                GooglePlayIabService.getInstance().mSavedOnPurchaseListener.success(purchase);
+                            GooglePlayIabService.getInstance().stopIabHelper(null);
+                        }
+                    });
+                } else {
+                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener.success(purchase);
+                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
+
+                    GooglePlayIabService.getInstance().stopIabHelper(null);
+                    return;
+                }
             } else if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_USER_CANCELED) {
 
                 GooglePlayIabService.getInstance().mSavedOnPurchaseListener.cancelled(purchase);
@@ -474,7 +501,7 @@ public class GooglePlayIabService implements IIabService {
 
                 GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(result.getMessage());
             }
-            GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
+            //GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
 
             GooglePlayIabService.getInstance().stopIabHelper(null);
         }
@@ -636,9 +663,6 @@ public class GooglePlayIabService implements IIabService {
     private static final String SKU = "ID#sku";
     private static final String EXTRA_DATA = "ID#extraData";
     private IabCallbacks.OnPurchaseListener mSavedOnPurchaseListener = null;
-
-    private final List<SoomlaGpVerification> svList = new ArrayList<SoomlaGpVerification>();
-    private Lock lock = new ReentrantLock();
 
     /**
      * When set to true, this removes the need to verify purchases when there's no signature.
