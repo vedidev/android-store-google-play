@@ -70,8 +70,7 @@ public class SoomlaGpVerification {
     }
 
     public void verifyPurchase() {
-        boolean success = SoomlaGpVerification.this.verifyOnServerFailure;
-        boolean verified = false;
+        boolean verified = SoomlaGpVerification.this.verifyOnServerFailure;
 
         UnexpectedStoreErrorEvent.ErrorCode errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_TIMEOUT;
 
@@ -125,7 +124,6 @@ public class SoomlaGpVerification {
                                 errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
                                 SoomlaUtils.LogError(TAG, "Failed to verify transaction receipt. The user will not get what he just bought.");
                             }
-                            success = true;
                         } else {
                         SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
                                 "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
@@ -147,7 +145,7 @@ public class SoomlaGpVerification {
             SoomlaUtils.LogError(TAG, e.getMessage());
         }
 
-        purchase.setServerVerified(verified || success);
+        purchase.setServerVerified(verified);
         purchase.setVerificationErrorCode(errorCode);
     }
 

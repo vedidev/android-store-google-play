@@ -35,13 +35,11 @@ import com.soomla.store.billing.IabInventory;
 import com.soomla.store.billing.IabPurchase;
 import com.soomla.store.billing.IabResult;
 import com.soomla.store.billing.IabSkuDetails;
-import com.soomla.store.domain.PurchasableVirtualItem;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * This is the Google Play plugin implementation of IIabService.
@@ -154,7 +152,7 @@ public class GooglePlayIabService implements IIabService {
         edit.commit();
     }
 
-    private static boolean getVerifyPurchases() {
+    private static boolean shouldVerifyPurchases() {
         return !TextUtils.isEmpty(KeyValueStorage.getValue(VERIFY_PURCHASES_KEY));
     }
 
@@ -366,17 +364,15 @@ public class GooglePlayIabService implements IIabService {
                     purchases.add(purchase);
                 }
 
-                if (getVerifyPurchases()) {
+                if (shouldVerifyPurchases()) {
                     verifyPurchases(purchases, new VerifyPurchasesFinishedListener() {
                         @Override
                         public void finished() {
-                            mRestorePurchasesListener.success(purchases);
-                            stopIabHelper(null);
+                            restorePurchasessFinished(purchases);
                         }
                     });
                 } else {
-                    mRestorePurchasesListener.success(purchases);
-                    stopIabHelper(null);
+                    restorePurchasessFinished(purchases);
                 }
 
             } else {
@@ -385,6 +381,11 @@ public class GooglePlayIabService implements IIabService {
                 stopIabHelper(null);
             }
 
+        }
+
+        private void restorePurchasessFinished(List<IabPurchase> purchases) {
+            mRestorePurchasesListener.success(purchases);
+            stopIabHelper(null);
         }
     }
 
@@ -472,25 +473,17 @@ public class GooglePlayIabService implements IIabService {
             GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
 
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK) {
-                if (getVerifyPurchases()) {
-                    List<IabPurchase> purchases = new ArrayList<IabPurchase>();
-                    purchases.add(purchase);
-                    GooglePlayIabService.getInstance().verifyPurchases(purchases, new VerifyPurchasesFinishedListener() {
+                if (shouldVerifyPurchases()) {
+                    GooglePlayIabService.getInstance().verifyPurchases(Arrays.asList(purchase), new VerifyPurchasesFinishedListener() {
                         @Override
                         public void finished() {
-                            GooglePlayIabService.getInstance().mSavedOnPurchaseListener.success(purchase);
-                            GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
-
-                            GooglePlayIabService.getInstance().stopIabHelper(null);
+                            purchaseFinishedSuccessfully(purchase);
                         }
                     });
                 } else {
-                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener.success(purchase);
-                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
-
-                    GooglePlayIabService.getInstance().stopIabHelper(null);
-                    return;
+                    purchaseFinishedSuccessfully(purchase);
                 }
+                return;
             } else if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_USER_CANCELED) {
 
                 GooglePlayIabService.getInstance().mSavedOnPurchaseListener.cancelled(purchase);
@@ -501,8 +494,17 @@ public class GooglePlayIabService implements IIabService {
 
                 GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(result.getMessage());
             }
-            //GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
 
+            purchaseFinished();
+        }
+
+        private void purchaseFinishedSuccessfully(IabPurchase purchase) {
+            GooglePlayIabService.getInstance().mSavedOnPurchaseListener.success(purchase);
+            purchaseFinished();
+        }
+
+        private void purchaseFinished() {
+            GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
             GooglePlayIabService.getInstance().stopIabHelper(null);
         }
     }
