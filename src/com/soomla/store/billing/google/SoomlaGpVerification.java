@@ -129,7 +129,7 @@ public class SoomlaGpVerification {
                                 "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                         }
                     } else {
-                        SoomlaUtils.LogError(TAG, "Cannot refresh token");
+                        SoomlaUtils.LogError(TAG, "Got null response");
                     }
                 } else {
                     SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
@@ -181,7 +181,7 @@ public class SoomlaGpVerification {
 
         int statusCode = resp.getStatusLine().getStatusCode();
         if (statusCode < 200 || statusCode > 299) {
-            SoomlaUtils.LogError(TAG, "There was a problem when verifying. Will try again later.");
+            SoomlaUtils.LogError(TAG, "There was a problem refreshing the token. Will try again later.");
             return false;
         }
 
