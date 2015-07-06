@@ -127,7 +127,7 @@ public class GooglePlayIabService implements IIabService {
 
                     consumeListener.fail(result.getMessage());
                 }
-        }
+            }
         });
     }
 

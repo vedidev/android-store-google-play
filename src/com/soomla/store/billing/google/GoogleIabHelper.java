@@ -287,7 +287,7 @@ public class GoogleIabHelper extends IabHelper {
                SoomlaUtils.LogDebug(TAG, "Successfully consumed sku: " + sku);
             }
             else {
-               SoomlaUtils.LogDebug(TAG, "Error consuming consuming sku " + sku + ". " + IabResult.getResponseDesc(response));
+               SoomlaUtils.LogDebug(TAG, "Error consuming sku " + sku + ". " + IabResult.getResponseDesc(response));
                throw new IabException(response, "Error consuming sku " + sku);
             }
         }
