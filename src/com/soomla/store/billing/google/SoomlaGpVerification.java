@@ -92,6 +92,7 @@ public class SoomlaGpVerification {
                     jsonObject.put("productId", purchase.getSku());
                     jsonObject.put("accessToken", accessToken);
                     SoomlaUtils.LogDebug(TAG, String.format("verifying purchase on server: %s", VERIFY_URL));
+                    SoomlaUtils.LogDebug(TAG, "purchase details: sku = " + purchase.getSku() + " token = " + purchaseToken);
 
                     SharedPreferences prefs = SoomlaApp.getAppContext().
                             getSharedPreferences("store.verification.prefs", Context.MODE_PRIVATE);
