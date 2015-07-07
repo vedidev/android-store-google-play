@@ -152,10 +152,6 @@ public class GooglePlayIabService implements IIabService {
         edit.commit();
     }
 
-    private static boolean shouldVerifyPurchases() {
-        return !TextUtils.isEmpty(KeyValueStorage.getValue(VERIFY_PURCHASES_KEY));
-    }
-
     @Override
     public void configVerifyPurchases(Map<String, Object> config) {
 
@@ -185,35 +181,6 @@ public class GooglePlayIabService implements IIabService {
 
             KeyValueStorage.setValue(VERIFY_PURCHASES_KEY, "yes");
         }
-    }
-
-    private void verifyPurchases(final List<IabPurchase> purchases, final VerifyPurchasesFinishedListener listener) {
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
-
-                for (IabPurchase purchase : purchases) {
-
-                    SoomlaGpVerification sv = new SoomlaGpVerification(purchase,
-                            KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
-                            KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
-                            KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY),
-                            Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE)));
-
-                    sv.verifyPurchase();
-                }
-
-                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                    @Override
-                    public void run() {
-                        listener.finished();
-                    }
-                });
-
-            }
-        }).start();
     }
 
     public void setAccessToken(String token) {
@@ -334,8 +301,50 @@ public class GooglePlayIabService implements IIabService {
         }
     }
 
-    public interface VerifyPurchasesFinishedListener {
+    private static boolean shouldVerifyPurchases() {
+        return !TextUtils.isEmpty(KeyValueStorage.getValue(VERIFY_PURCHASES_KEY));
+    }
 
+    /**
+     * Async method - safe to run on ui thread.
+     * Verifies purchases using the soomla server.
+     */
+    private void verifyPurchases(final List<IabPurchase> purchases, final VerifyPurchasesFinishedListener listener) {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+
+                for (IabPurchase purchase : purchases) {
+
+                    SoomlaGpVerification sv = new SoomlaGpVerification(purchase,
+                            KeyValueStorage.getValue(VERIFY_CLIENT_ID_KEY),
+                            KeyValueStorage.getValue(VERIFY_CLIENT_SECRET_KEY),
+                            KeyValueStorage.getValue(VERIFY_REFRESH_TOKEN_KEY),
+                            Boolean.parseBoolean(KeyValueStorage.getValue(VERIFY_ON_SERVER_FAILURE)));
+
+                    sv.verifyPurchase();
+                }
+
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        listener.finished();
+                    }
+                });
+
+            }
+        }).start();
+    }
+
+    /**
+     * Callback for verify purchases.
+     */
+    public interface VerifyPurchasesFinishedListener {
+        /**
+         * Celled to notify that a verify purchases operation completed.
+         */
         public void finished();
 
     }
@@ -621,24 +630,6 @@ public class GooglePlayIabService implements IIabService {
         Object strToCheck = config.get(key);
         if (strToCheck == null || !(strToCheck instanceof String) || TextUtils.isEmpty((String) strToCheck)) {
             throw new IllegalArgumentException("Please, provide value for " + key);
-        }
-    }
-
-    private static void runAsync(final Runnable runnable) {
-        AsyncTask<Void, Void, Void> asyncTask = new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(Void... params) {
-                runnable.run();
-                return null;
-            }
-        };
-
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-            asyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null, null);
-        }
-        else {
-            asyncTask.execute(null, null);
         }
     }
 
