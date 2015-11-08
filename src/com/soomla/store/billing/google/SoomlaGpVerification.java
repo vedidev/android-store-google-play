@@ -124,6 +124,11 @@ public class SoomlaGpVerification {
                             } else {
                                 errorCode = UnexpectedStoreErrorEvent.ErrorCode.VERIFICATION_FAIL;
                                 SoomlaUtils.LogError(TAG, "Failed to verify transaction receipt. The user will not get what he just bought.");
+                                try {
+                                    SoomlaUtils.LogError(TAG, "Reason: " + resultJsonObject.getJSONObject("reason").getJSONObject("error").getString("message"));
+                                } catch (JSONException jsonException) {
+                                    //nothing to to, just can't find required field in JSON
+                                }
                             }
                         } else {
                         SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
