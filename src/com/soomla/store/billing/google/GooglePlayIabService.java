@@ -19,7 +19,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.*;
+import android.os.AsyncTask;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Process;
 import android.text.TextUtils;
 import com.soomla.SoomlaApp;
@@ -501,21 +505,30 @@ public class GooglePlayIabService implements IIabService {
                 }
                 return;
             } else if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_USER_CANCELED) {
-
-                GooglePlayIabService.getInstance().mSavedOnPurchaseListener.cancelled(purchase);
+                IabCallbacks.OnPurchaseListener onPurchaseListener = GooglePlayIabService.getInstance().mSavedOnPurchaseListener;
+                if (onPurchaseListener != null) {
+                    onPurchaseListener.cancelled(purchase);
+                }
             } else if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_ITEM_ALREADY_OWNED) {
-
-                GooglePlayIabService.getInstance().mSavedOnPurchaseListener.alreadyOwned(purchase);
+                IabCallbacks.OnPurchaseListener onPurchaseListener = GooglePlayIabService.getInstance().mSavedOnPurchaseListener;
+                if (onPurchaseListener != null) {
+                    onPurchaseListener.alreadyOwned(purchase);
+                }
             } else {
-
-                GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(result.getMessage());
+                IabCallbacks.OnPurchaseListener onPurchaseListener = GooglePlayIabService.getInstance().mSavedOnPurchaseListener;
+                if (onPurchaseListener != null) {
+                    onPurchaseListener.fail(result.getMessage());
+                }
             }
 
             purchaseFinished();
         }
 
         private void purchaseFinishedSuccessfully(IabPurchase purchase) {
-            GooglePlayIabService.getInstance().mSavedOnPurchaseListener.success(purchase);
+            IabCallbacks.OnPurchaseListener onPurchaseListener = GooglePlayIabService.getInstance().mSavedOnPurchaseListener;
+            if (onPurchaseListener != null) {
+                onPurchaseListener.success(purchase);
+            }
             purchaseFinished();
         }
 
@@ -556,8 +569,10 @@ public class GooglePlayIabService implements IIabService {
                 String msg = "Error purchasing item " + e.getMessage();
                 SoomlaUtils.LogError(TAG, msg);
                 GooglePlayIabService.getInstance().mWaitingServiceResponse = false;
-                if (GooglePlayIabService.getInstance().mSavedOnPurchaseListener != null) {
-                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(msg);
+
+                IabCallbacks.OnPurchaseListener onPurchaseListener = GooglePlayIabService.getInstance().mSavedOnPurchaseListener;
+                if (onPurchaseListener != null) {
+                    onPurchaseListener.fail(msg);
                     GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
                 }
             }
@@ -622,9 +637,10 @@ public class GooglePlayIabService implements IIabService {
                 // we're letting the helper take care of closing so there won't be any async process stuck in it.
                 onActivityResult(10001, Activity.RESULT_CANCELED, null);
 
-//                if (GooglePlayIabService.getInstance().mSavedOnPurchaseListener != null) {
+//                IabCallbacks.OnPurchaseListener onPurchaseListener = GooglePlayIabService.getInstance().mSavedOnPurchaseListener;
+//                if (onPurchaseListener != null) {
 //                    SoomlaUtils.LogDebug(TAG, "onDestroy 3");
-//                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener.fail(err);
+//                    onPurchaseListener.fail(err);
 //                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener = null;
 //                }
             }
