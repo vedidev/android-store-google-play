@@ -385,6 +385,7 @@ public class GooglePlayIabService implements IIabService {
                 }
 
                 if (isVerifyPurchasesEnabled()) {
+                    mRestorePurchasesListener.verificationStarted(purchases);
                     verifyPurchases(purchases, new VerifyPurchasesFinishedListener() {
                         @Override
                         public void finished() {
@@ -494,7 +495,9 @@ public class GooglePlayIabService implements IIabService {
 
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK) {
                 if (isVerifyPurchasesEnabled()) {
-                    GooglePlayIabService.getInstance().verifyPurchases(Arrays.asList(purchase), new VerifyPurchasesFinishedListener() {
+                    List<IabPurchase> purchases = Arrays.asList(purchase);
+                    GooglePlayIabService.getInstance().mSavedOnPurchaseListener.verificationStarted(purchases);
+                    GooglePlayIabService.getInstance().verifyPurchases(purchases, new VerifyPurchasesFinishedListener() {
                         @Override
                         public void finished() {
                             purchaseFinishedSuccessfully(purchase);
