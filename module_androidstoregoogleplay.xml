@@ -2,6 +2,7 @@
 <project name="module_androidstoregoogleplay" default="compile.module.androidstoregoogleplay">
   <dirname property="module.androidstoregoogleplay.basedir" file="${ant.file.module_androidstoregoogleplay}"/>
 
+    <property name="aidl" value="${jdk.home.android.platform.tools}aidl" />
     <property name="framework-aidl" value="${jdk.home.android.platform}framework.aidl" />
 
   <property name="module.jdk.home.androidstoregoogleplay" value="${jdk.home.android}"/>
@@ -84,7 +85,7 @@
 
     <target name="aidl" >
         <echo>Compiling .aidl into java files...</echo>
-        <apply executable="aidl" failonerror="true">
+        <apply executable="${aidl}" failonerror="true">
             <!--  -->
             <arg value="-p${framework-aidl}" />
             <!-- aidl -->
