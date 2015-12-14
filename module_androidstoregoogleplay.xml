@@ -22,6 +22,7 @@
     <pathelement location="${basedir}/libs/square-otto-1.3.2.jar"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
     <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
+	<pathelement location="${basedir}/libs/IInAppBillingService.jar"/>
   </path>
 
   <path id="androidstoregoogleplay.runtime.production.module.classpath">
@@ -29,6 +30,7 @@
     <pathelement location="${basedir}/libs/square-otto-1.3.2.jar"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
     <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
+	<pathelement location="${basedir}/libs/IInAppBillingService.jar"/>
   </path>
 
   <path id="androidstoregoogleplay.module.classpath">
@@ -37,6 +39,7 @@
     <pathelement location="${basedir}/libs/square-otto-1.3.2.jar"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
     <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
+	<pathelement location="${basedir}/libs/IInAppBillingService.jar"/>
   </path>
 
   <path id="androidstoregoogleplay.runtime.module.classpath">
@@ -44,6 +47,7 @@
     <pathelement location="${basedir}/libs/square-otto-1.3.2.jar"/>
     <pathelement location="${basedir}/libs/AndroidStore.jar"/>
     <pathelement location="${basedir}/libs/SoomlaAndroidCore.jar"/>
+	<pathelement location="${basedir}/libs/IInAppBillingService.jar"/>
   </path>
 
 
