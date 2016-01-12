@@ -3,7 +3,14 @@ set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd $DIR
 
+ANDROID_STORE_CACHE=~/.soomla/cache/android-store
+
 if [ ! -d libs/IInAppBillingService.jar ];
 then
-    curl -L -o libs/IInAppBillingService.jar http://library.soom.la/fetch/android-store-google-play-iab/3?cf=dl_deps
+    if [ ! -f $ANDROID_STORE_CACHE/IInAppBillingService.jar ];
+    then
+        curl -L -o $ANDROID_STORE_CACHE/IInAppBillingService.jar.tmp http://library.soom.la/fetch/android-store-google-play-iab/3?cf=dl_deps
+        mv $ANDROID_STORE_CACHE/IInAppBillingService.jar.tmp $ANDROID_STORE_CACHE/IInAppBillingService.jar
+    fi
+    cp $ANDROID_STORE_CACHE/IInAppBillingService.jar libs/IInAppBillingService.jar
 fi
