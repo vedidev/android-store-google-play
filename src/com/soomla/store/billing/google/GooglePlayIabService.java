@@ -207,6 +207,7 @@ public class GooglePlayIabService implements IIabService {
      */
     @Override
     public void launchPurchaseFlow(String sku,
+                                   String itemType,
                                    final IabCallbacks.OnPurchaseListener purchaseListener,
                                    String extraData) {
 
@@ -222,6 +223,7 @@ public class GooglePlayIabService implements IIabService {
         try {
             final Intent intent = new Intent(SoomlaApp.getAppContext(), IabActivity.class);
             intent.putExtra(SKU, sku);
+            intent.putExtra(ITEM_TYPE, itemType);
             intent.putExtra(EXTRA_DATA, extraData);
 
             mSavedOnPurchaseListener = purchaseListener;
@@ -377,7 +379,8 @@ public class GooglePlayIabService implements IIabService {
             SoomlaUtils.LogDebug(TAG, "Restore Purchases succeeded");
             if (result.getResponse() == IabResult.BILLING_RESPONSE_RESULT_OK && mRestorePurchasesListener != null) {
                 // fetching owned items
-                List<String> itemSkus = inventory.getAllOwnedSkus(IabHelper.ITEM_TYPE_INAPP);
+                List<String> itemSkus = inventory.getAllOwnedSkus();
+
                 final List<IabPurchase> purchases = new ArrayList<IabPurchase>();
                 for (String sku : itemSkus) {
                     IabPurchase purchase = inventory.getPurchase(sku);
@@ -556,11 +559,12 @@ public class GooglePlayIabService implements IIabService {
 
             Intent intent = getIntent();
             String productId = intent.getStringExtra(SKU);
+            String itemType = intent.getStringExtra(ITEM_TYPE);
             String payload = intent.getStringExtra(EXTRA_DATA);
 
             try {
                 OnIabPurchaseFinishedListener onIabPurchaseFinishedListener = new OnIabPurchaseFinishedListener();
-                GooglePlayIabService.getInstance().mHelper.launchPurchaseFlow(this, productId, onIabPurchaseFinishedListener, payload);
+                GooglePlayIabService.getInstance().mHelper.launchPurchaseFlow(this, itemType, productId, onIabPurchaseFinishedListener, payload);
                 GooglePlayIabService.getInstance().mWaitingServiceResponse = true;
             } catch (IllegalStateException e) {
                 mInProgressDestroy = true;
@@ -680,6 +684,7 @@ public class GooglePlayIabService implements IIabService {
     public static final String VERIFY_ACCESS_TOKEN_KEY = "soomla.verification.accessToken";
 
     private static final String SKU = "ID#sku";
+    private static final String ITEM_TYPE = "ID#itemType";
     private static final String EXTRA_DATA = "ID#extraData";
     private IabCallbacks.OnPurchaseListener mSavedOnPurchaseListener = null;
 

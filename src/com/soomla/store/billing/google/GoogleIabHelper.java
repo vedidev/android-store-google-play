@@ -105,8 +105,10 @@ public class GoogleIabHelper extends IabHelper {
                     SoomlaUtils.LogDebug(TAG, "Checking for in-app billing 3 support.");
 
                     // check for in-app billing v3 support
-                    int response = mService.isBillingSupported(3, packageName, ITEM_TYPE_INAPP);
-                    if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                    int inAppResponse = mService.isBillingSupported(3, packageName, ITEM_TYPE_INAPP);
+                    int subsResponse = mService.isBillingSupported(3, packageName, ITEM_TYPE_SUBS);
+                    if (inAppResponse != IabResult.BILLING_RESPONSE_RESULT_OK
+                            || subsResponse != IabResult.BILLING_RESPONSE_RESULT_OK) {
                         setupFailed(new IabResult(response, "Error checking for billing v3 support."));
                         return;
                     }
@@ -401,18 +403,22 @@ public class GoogleIabHelper extends IabHelper {
      * See parent
      */
     @Override
-    protected void launchPurchaseFlowInner(Activity act, String sku, String extraData) {
+    protected void launchPurchaseFlowInner(Activity act, String itemType, String sku, String extraData) {
         IabResult result;
 
+        if (itemType != ITEM_TYPE_INAPP && itemType != ITEM_TYPE_SUBS) {
+            throw new IllegalArgumentException("Wrong purchase item type.");
+        }
+
         try {
-            SoomlaUtils.LogDebug(TAG, "Constructing buy intent for " + sku + ", item type: " + ITEM_TYPE_INAPP);
-            Bundle buyIntentBundle = mService.getBuyIntent(3, SoomlaApp.getAppContext().getPackageName(), sku, ITEM_TYPE_INAPP, extraData);
+            SoomlaUtils.LogDebug(TAG, "Constructing buy intent for " + sku + ", item type: " + itemType);
+            Bundle buyIntentBundle = mService.getBuyIntent(3, SoomlaApp.getAppContext().getPackageName(), sku, itemType, extraData);
             buyIntentBundle.putString("PURCHASE_SKU", sku);
             int response = getResponseCodeFromBundle(buyIntentBundle);
             if (response != IabResult.BILLING_RESPONSE_RESULT_OK) {
                 SoomlaUtils.LogError(TAG, "Unable to buy item, Error response: " + IabResult.getResponseDesc(response));
 
-                IabPurchase failPurchase = new IabPurchase(ITEM_TYPE_INAPP, "{\"productId\":" + sku + "}", null);
+                IabPurchase failPurchase = new IabPurchase(itemType, "{\"productId\":" + sku + "}", null);
                 result = new IabResult(response, "Unable to buy item");
                 purchaseFailed(result, failPurchase);
                 act.finish();
@@ -422,7 +428,7 @@ public class GoogleIabHelper extends IabHelper {
             PendingIntent pendingIntent = buyIntentBundle.getParcelable(RESPONSE_BUY_INTENT);
             SoomlaUtils.LogDebug(TAG, "Launching buy intent for " + sku + ". Request code: " + RC_REQUEST);
             mPurchasingItemSku = sku;
-            mPurchasingItemType = ITEM_TYPE_INAPP;
+            mPurchasingItemType = itemType;
 
             act.startIntentSenderForResult(pendingIntent.getIntentSender(),
                     RC_REQUEST, new Intent(),
@@ -510,8 +516,10 @@ public class GoogleIabHelper extends IabHelper {
         checkSetupDoneAndThrow("fetchSkusDetails");
         try {
             IabInventory inv = new IabInventory();
-            int r = querySkuDetails(ITEM_TYPE_INAPP, inv, skus);
-            if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
+            int inAppResult = querySkuDetails(ITEM_TYPE_INAPP, inv, skus);
+            int subsResult = querySkuDetails(ITEM_TYPE_SUBS, inv, skus);
+            if (inAppResult != IabResult.BILLING_RESPONSE_RESULT_OK
+                    || subsResult != IabResult.BILLING_RESPONSE_RESULT_OK) {
                 throw new IabException(r, "Error refreshing inventory (querying prices of items).");
             }
 
@@ -606,8 +614,9 @@ public class GoogleIabHelper extends IabHelper {
         checkSetupDoneAndThrow("restorePurchases");
         try {
             IabInventory inv = new IabInventory();
-            int r = queryPurchases(inv, ITEM_TYPE_INAPP);
-            if (r != IabResult.BILLING_RESPONSE_RESULT_OK) {
+            int inAppResult = queryPurchases(inv, ITEM_TYPE_INAPP);
+            int subsResult = queryPurchases(inv, ITEM_TYPE_SUBS);
+            if (inAppResult != IabResult.BILLING_RESPONSE_RESULT_OK || subsResult != IabResult.BILLING_RESPONSE_RESULT_OK) {
                 throw new IabException(r, "Error refreshing inventory (querying owned items).");
             }
             return inv;
