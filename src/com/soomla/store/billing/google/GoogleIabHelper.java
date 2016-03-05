@@ -109,7 +109,7 @@ public class GoogleIabHelper extends IabHelper {
                     int subsResponse = mService.isBillingSupported(3, packageName, ITEM_TYPE_SUBS);
                     if (inAppResponse != IabResult.BILLING_RESPONSE_RESULT_OK
                             || subsResponse != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                        setupFailed(new IabResult(response, "Error checking for billing v3 support."));
+                        setupFailed(new IabResult(inAppResponse != 0 ? inAppResponse : subsResponse, "Error checking for billing v3 support."));
                         return;
                     }
                     SoomlaUtils.LogDebug(TAG, "In-app billing version 3 supported for " + packageName);
@@ -520,7 +520,7 @@ public class GoogleIabHelper extends IabHelper {
             int subsResult = querySkuDetails(ITEM_TYPE_SUBS, inv, skus);
             if (inAppResult != IabResult.BILLING_RESPONSE_RESULT_OK
                     || subsResult != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                throw new IabException(r, "Error refreshing inventory (querying prices of items).");
+                throw new IabException(inAppResult != inAppResult ? inAppResult : subsResult, "Error refreshing inventory (querying prices of items).");
             }
 
             return inv;
@@ -616,8 +616,9 @@ public class GoogleIabHelper extends IabHelper {
             IabInventory inv = new IabInventory();
             int inAppResult = queryPurchases(inv, ITEM_TYPE_INAPP);
             int subsResult = queryPurchases(inv, ITEM_TYPE_SUBS);
-            if (inAppResult != IabResult.BILLING_RESPONSE_RESULT_OK || subsResult != IabResult.BILLING_RESPONSE_RESULT_OK) {
-                throw new IabException(r, "Error refreshing inventory (querying owned items).");
+            if (inAppResult != IabResult.BILLING_RESPONSE_RESULT_OK
+                    || subsResult != IabResult.BILLING_RESPONSE_RESULT_OK) {
+                throw new IabException(inAppResult != 0 ? inAppResult : subsResult, "Error refreshing inventory (querying owned items).");
             }
             return inv;
         }
