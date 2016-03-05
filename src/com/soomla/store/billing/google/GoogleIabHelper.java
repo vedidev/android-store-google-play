@@ -406,7 +406,7 @@ public class GoogleIabHelper extends IabHelper {
     protected void launchPurchaseFlowInner(Activity act, String itemType, String sku, String extraData) {
         IabResult result;
 
-        if (itemType != ITEM_TYPE_INAPP && itemType != ITEM_TYPE_SUBS) {
+        if (!(itemType.equals(ITEM_TYPE_INAPP) || itemType.equals(ITEM_TYPE_SUBS))) {
             throw new IllegalArgumentException("Wrong purchase item type: " + itemType);
         }
 

@@ -206,8 +206,8 @@ public class GooglePlayIabService implements IIabService {
      * see parent
      */
     @Override
-    public void launchPurchaseFlow(String sku,
-                                   String itemType,
+    public void launchPurchaseFlow(String itemType,
+                                   String sku,
                                    final IabCallbacks.OnPurchaseListener purchaseListener,
                                    String extraData) {
 
