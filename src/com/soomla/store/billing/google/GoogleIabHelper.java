@@ -99,6 +99,7 @@ public class GoogleIabHelper extends IabHelper {
             @Override
             public void onServiceConnected(ComponentName name, IBinder service) {
                 SoomlaUtils.LogDebug(TAG, "Billing service connected.");
+                GoogleIabHelper.this.service = service;
                 mService = IInAppBillingService.Stub.asInterface(service);
                 String packageName = SoomlaApp.getAppContext().getPackageName();
                 try {
@@ -540,7 +541,15 @@ public class GoogleIabHelper extends IabHelper {
 
         do {
             SoomlaUtils.LogDebug(TAG, "Calling getPurchases with continuation token: " + continueToken);
-            Bundle ownedItems = mService.getPurchases(3, SoomlaApp.getAppContext().getPackageName(),
+            if (mService == null) {
+                if (service != null) {
+                    mService = IInAppBillingService.Stub.asInterface(service);
+                } else {
+                    return IabResult.IABHELPER_VERIFICATION_FAILED;
+                }
+            }
+            Bundle ownedItems = mService.getPurchases(3,
+                    SoomlaApp.getAppContext().getPackageName(),
                     itemType, continueToken);
 
             int response = getResponseCodeFromBundle(ownedItems);
@@ -742,6 +751,7 @@ public class GoogleIabHelper extends IabHelper {
     // Connection to the service
     private IInAppBillingService mService;
     private ServiceConnection mServiceConn;
+    private IBinder service;
 
     // The item type of the current purchase flow
     private String mPurchasingItemType;
