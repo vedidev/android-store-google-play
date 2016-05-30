@@ -27,6 +27,6 @@ proguard/
 *.iml
 *.ipr
 *.iws
-.idea/
+.idea/*
 
 libs/IInAppBillingService.jar
