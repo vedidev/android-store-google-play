@@ -27,6 +27,7 @@ proguard/
 *.iml
 *.ipr
 *.iws
-.idea/
+**idea/
+**gradle/
 
 libs/IInAppBillingService.jar
