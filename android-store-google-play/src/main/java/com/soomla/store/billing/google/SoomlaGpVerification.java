@@ -131,8 +131,8 @@ public class SoomlaGpVerification {
                                 }
                             }
                         } else {
-                        SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
-                                "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
+                            SoomlaUtils.LogError(TAG, "An error occurred while trying to get receipt purchaseToken. " +
+                                    "Stopping the purchasing process for: " + SoomlaGpVerification.this.purchase.getSku());
                         }
                     } else {
                         SoomlaUtils.LogError(TAG, "Got null response");
